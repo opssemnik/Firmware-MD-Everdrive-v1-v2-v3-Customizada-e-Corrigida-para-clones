@@ -9,6 +9,7 @@ MEMORY
     ROMC (rx) : ORIGIN = 0x1C220, LENGTH = 0x0A00
     ROMB (rx) : ORIGIN = 0x1DB20, LENGTH = 0x07A0
     ROMA (rx) : ORIGIN = 0x1E400, LENGTH = 0x1BF8
+    ROMD (rx) : ORIGIN = 0x1CC20, LENGTH = 0x0F00     /* POA logo rows 2-4: diagnostics build only */
     RAM  (rw) : ORIGIN = 0xFFE400, LENGTH = 0x0C00
 }
 
@@ -16,6 +17,7 @@ SECTIONS
 {
     .text : { *(.text .text.*) *(.rodata .rodata.*) } > ROMA
     .strb : { *(.strb) } > ROMB
+    .diag : { *(.diag) *(.diagro) } > ROMD
     .strc : { *(.strc) } > ROMC
     .ramstub : { *(.ramstub) } > RAM AT > ROMA
     .data : { *(.data .data.*) } > RAM AT > ROMA

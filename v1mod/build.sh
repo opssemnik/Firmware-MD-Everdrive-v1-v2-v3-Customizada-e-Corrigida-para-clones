@@ -1,7 +1,8 @@
 #!/bin/bash
 # Compiles the v1 mod inside WSL with the rootless m68k toolchain (~/m68k/root).
-# usage: build.sh BUILD_ID   (run by build_v1_ptbr.py)
+# usage: build.sh BUILD_ID [DEFINES]   (run by build_v1_ptbr.py; DEFINES e.g. "-DDIAG")
 set -euo pipefail
+DEFS="${2:-}"
 R=$HOME/m68k/root
 export PATH=$R/usr/bin:$PATH
 export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu
@@ -13,13 +14,13 @@ mkdir -p build
 CFLAGS="-m68000 -Os -ffreestanding -fno-pic -fno-pie -fomit-frame-pointer -fno-asynchronous-unwind-tables \
  -fno-tree-loop-distribute-patterns -fno-common -Wall -Wno-pointer-sign -Werror"
 
-$CC $CFLAGS -I. -Ibuild -c mod.c -o build/mod.o
-$CC $CFLAGS -I. -Ibuild -c build/gen.c -o build/gen.o
-$CC -m68000 -DBUILD_ID=$1 -c hooks.S -o build/hooks.o
+$CC $CFLAGS $DEFS -I. -Ibuild -c mod.c -o build/mod.o
+$CC $CFLAGS $DEFS -I. -Ibuild -c build/gen.c -o build/gen.o
+$CC -m68000 $DEFS -DBUILD_ID=$1 -c hooks.S -o build/hooks.o
 $CC -m68000 -nostdlib -no-pie -static -T link.ld -Wl,-Map=build/mod.map -Wl,--no-warn-rwx-segments \
     build/mod.o build/gen.o build/hooks.o -o build/mod.elf
 
-for s in text strb strc ramstub data; do
+for s in text strb strc ramstub data diag; do
     ${P}objcopy -O binary -j .$s build/mod.elf build/$s.bin
 done
 ${P}nm -n build/mod.elf > build/mod.sym

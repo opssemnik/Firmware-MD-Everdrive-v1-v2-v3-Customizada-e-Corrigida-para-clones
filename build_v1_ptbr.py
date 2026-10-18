@@ -21,7 +21,8 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-OUT = HERE / 'OS-V38-PTBR.BIN'
+DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
+OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
 RAM = 0xFF0000          # RAM address of file offset 0
 CART = 0x10000          # cart address of file offset 0
@@ -305,7 +306,8 @@ def wsl_path(p):
 
 
 def compile_mod(build_id):
-    r = subprocess.run(['wsl', '-d', 'Debian', '--', 'bash', wsl_path(MOD / 'build.sh'), str(build_id)],
+    r = subprocess.run(['wsl', '-d', 'Debian', '--', 'bash', wsl_path(MOD / 'build.sh'), str(build_id),
+                        '-DDIAG' if DIAG else ''],
                        capture_output=True, text=True)
     if r.returncode:
         print(r.stdout, r.stderr)
@@ -344,14 +346,17 @@ def main():
 
     src = b''.join((MOD / f).read_bytes() for f in ('os.h', 'mod.c', 'hooks.S', 'link.ld'))
     src += (BUILD / 'gen.c').read_bytes()
-    src += Path(__file__).read_bytes()
+    src += Path(__file__).read_bytes() + (b'DIAG' if DIAG else b'')
     build_id = zlib.crc32(src) & 0x7FFFFFFF | 1
 
     # 3. compile + place
     syms, secs = compile_mod(build_id)
     assert secs.get('.data', (0, 0, 0))[1] == 0, '.data must be empty (nothing copies it)'
     placed = []
-    for name in ('.text', '.ramstub', '.strb', '.strc'):
+    for name in ('.text', '.ramstub', '.strb', '.strc', '.diag'):
+        if name not in secs or not secs[name][1]:
+            assert name == '.diag' and not DIAG, f'missing section {name}'
+            continue
         lma, size, vma = secs[name]
         data = (BUILD / f'{name[1:]}.bin').read_bytes()
         assert len(data) == size
@@ -382,6 +387,12 @@ def main():
     patch(0xFF7C0A, bytes.fromhex('6100f736'), struct.pack('>Hh', 0x6100, disp))
     for ram in (0xFF5A60, 0xFF5A80):                                    # menu centre operands used by mod.c
         patch(ram, bytes.fromhex('48780014'), bytes.fromhex('48780014'))
+    if DIAG:    # timing probes at the entry of: status print, flash erase, flash write, checksum copy
+        jmp = lambda t, pad: struct.pack('>HI', 0x4EF9, t) + b'Nq' * pad
+        patch(0xFF7F7A, bytes.fromhex('103900ffe306'), jmp(syms['ramDStatus'], 0))
+        patch(0xFF5592, bytes.fromhex('48e73020246f0010'), jmp(syms['ramDErase'], 1))
+        patch(0xFF57D0, bytes.fromhex('48e73820242f0018'), jmp(syms['ramDWrite'], 1))
+        patch(0xFF4094, bytes.fromhex('4fefffe448e73c30'), jmp(syms['ramDCheck'], 1))
 
     # 5. strings: repoint references in the code, translate the RAM-resident ones in place
     md = Cs(CS_ARCH_M68K, CS_MODE_M68K_000 | CS_MODE_BIG_ENDIAN)

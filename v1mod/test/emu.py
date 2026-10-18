@@ -22,6 +22,7 @@ class Machine:
         self.mu = mu = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, UC_CPU_M68K_M68000)
         mu.mem_map(0x000000, 0x800000)                  # cart (boot/OS/settings/games)
         mu.mem_map(0xFF0000, 0x10000)                   # work RAM
+        mu.mem_map(0xA00000, 0x10000)                   # Z80 RAM (counter faked per frame in run())
         mu.mmio_map(0xA10000, 0x10000, self.io_r, None, self.io_w, None)
         mu.mmio_map(0xC00000, 0x10000, self.vdp_r, None, self.vdp_w, None)
         osimg = Path(os_path).read_bytes()
@@ -195,6 +196,9 @@ class Machine:
             self.mu.mem_write(0xFFE308, struct.pack('>I', cnt))
             self.vbl_pending = True
             self.vbl = (self.vbl + 1) & 0xFFFF
+            if self.mu.mem_read(0xA00000, 1)[0] == 0xF3:            # diagnostics Z80 stopwatch loaded
+                z = struct.unpack('<I', self.mu.mem_read(0xA01F00, 4))[0] + 63920 // 60
+                self.mu.mem_write(0xA01F00, struct.pack('<I', z))
             try:
                 self.mu.emu_start(pc, 0xFFFFFFFF, count=insns_per_frame)
             except UcError as e:

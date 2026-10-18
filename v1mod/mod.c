@@ -50,7 +50,7 @@ static char gArtName[24];
 static char gArtPath[40];
 static char gThemeItem[24];
 static char gItemBuf[LIST_MAX][38];
-static const char *gItems[LIST_MAX + 1];
+static const char *gItems[LIST_MAX + 2];
 static u8 gSector0[512] __attribute__((aligned(4)));   /* SD/OS routines access it by words */
 static u8 gArtBuf[512] __attribute__((aligned(4)));
 static u32 gArtHash;
@@ -362,6 +362,272 @@ static int entryValid(const ListEnt *le)
            le->size == ((u32)d[0x1f] << 24 | (u32)d[0x1e] << 16 | (u32)d[0x1d] << 8 | d[0x1c]);
 }
 
+
+#ifdef DIAG
+#define gFlashMode() (*(volatile u8 *)0xFFCC89)
+/* ======================= diagnostics build: load timings + flash chip info ======================
+ * The vblank counter stops while the OS programs the flash (VInt is disabled), so the Z80 is used
+ * as an independent stopwatch: a 56 T-state loop incrementing a 32-bit counter in its RAM. */
+#define DSEC __attribute__((section(".diag"), noinline))
+#define DSRO __attribute__((section(".diagro")))
+#define Z80_BUSREQ (*(volatile u16 *)0xA11100)
+#define Z80_RESET (*(volatile u16 *)0xA11200)
+#define Z80_RAM ((volatile u8 *)0xA00000)
+#define DMAX 19
+
+enum { EV_STATUS = 1, EV_ERASE, EV_WRITE, EV_CHECK, EV_START, EV_LOADED, EV_LIST };
+
+typedef struct {
+    u32 t, a, b;
+    u16 type, n;
+} DiagEv;
+
+static DiagEv gEv[DMAX];
+static u8 gNev, gRec;
+static u16 gFlash[52] __attribute__((aligned(4)));
+static char gLastName[40];
+static u32 gLastSize;
+
+extern void ramFlashProbe(u16 *out);
+
+static const u8 z80timer[] DSRO = {
+    0xF3, 0x31, 0x00, 0x20,             /* di ; ld sp,0x2000 */
+    0x21, 0x00, 0x00, 0x22, 0x00, 0x1F, 0x22, 0x02, 0x1F,   /* counter = 0 */
+    0x2A, 0x00, 0x1F, 0x23, 0x22, 0x00, 0x1F,               /* loop: ld hl,(lo) ; inc hl ; ld (lo),hl */
+    0x7C, 0xB5, 0xC2, 0x0D, 0x00,                           /* ld a,h ; or l ; jp nz,loop (56 T) */
+    0x2A, 0x02, 0x1F, 0x23, 0x22, 0x02, 0x1F, 0xC3, 0x0D, 0x00,  /* hi++ ; jp loop */
+};
+
+static const char DS_menu[] DSRO = "Diagnostico";
+static const char DS_title[] DSRO = "Diagnostico (versao de teste)";
+static const char DS_times[] DSRO = "Tempos do ultimo carregamento";
+static const char DS_none[] DSRO = "Nenhum jogo carregado ainda";
+static const char DS_start[] DSRO = "inicio";
+static const char DS_loaded[] DSRO = "fim do carregamento";
+static const char DS_list[] DSRO = "lista de recentes";
+static const char DS_erase[] DSRO = "apagar";
+static const char DS_write[] DSRO = "gravar";
+static const char DS_check[] DSRO = "rotina ff4094";
+static const char DS_total[] DSRO = "TOTAL (ms): ";
+static const char DS_ms[] DSRO = "ms";
+static const char DS_kbs[] DSRO = "copia (KB/s): ";
+static const char DS_kb[] DSRO = "KB: ";
+static const char DS_x[] DSRO = "x";
+static const char DS_empty[] DSRO = "";
+static const char DS_play[] DSRO = "Pressione um botao para continuar";
+static const char DS_keys[] DSRO = "A: tempos   B: voltar";
+static const char DS_manuf[] DSRO = "Fabricante: ";
+static const char DS_dev[] DSRO = "Dispositivo: ";
+static const char DS_size[] DSRO = "Tamanho (KB): ";
+static const char DS_buf[] DSRO = "Buffer de escrita (bytes): ";
+static const char DS_tword[] DSRO = "Gravar palavra tip. (us): ";
+static const char DS_tbuf[] DSRO = "Gravar buffer tip. (us): ";
+static const char DS_terase[] DSRO = "Apagar bloco tip. (ms): ";
+static const char DS_regions[] DSRO = "Regioes de bloco: ";
+static const char DS_region[] DSRO = "  blocos de (KB): ";
+static const char DS_nocfi[] DSRO = "CFI: sem resposta do chip";
+static const char DS_mode[] DSRO = "Gravacao do OS: ";
+static const char DS_mode1[] DSRO = "duplo (0x50)";
+static const char DS_mode2[] DSRO = "palavra (0xA0)";
+static const char DS_ntsc[] DSRO = "Regiao: NTSC 60Hz";
+static const char DS_pal[] DSRO = "Regiao: PAL 50Hz";
+static const char DS_raw[] DSRO = "CFI bruto 10-3F:";
+static const char DS_names[] DSRO = "\x01" "AMD/Spansion\0" "\x04" "Fujitsu\0" "\x1F" "Atmel\0" "\x20" "ST/Micron\0"
+                                    "\x37" "AMIC\0" "\x89" "Intel\0" "\xBF" "SST\0" "\xC2" "Macronix\0"
+                                    "\xC8" "GigaDevice\0" "\xDA" "Winbond\0" "\xEC" "Samsung\0" "\x1C" "EON\0";
+
+DSEC static void z80Wait(void)
+{
+    Z80_BUSREQ = 0x100;
+    while (Z80_BUSREQ & 0x100)
+        ;
+}
+
+DSEC static void z80Start(void)
+{
+    volatile int d;
+    unsigned i;
+    Z80_BUSREQ = 0x100;
+    Z80_RESET = 0x100;
+    while (Z80_BUSREQ & 0x100)
+        ;
+    for (i = 0; i < sizeof(z80timer); i++)
+        Z80_RAM[i] = z80timer[i];
+    Z80_RESET = 0;
+    Z80_BUSREQ = 0;
+    for (d = 0; d < 32; d++)
+        ;
+    Z80_RESET = 0x100;
+}
+
+DSEC static void z80Stop(void)
+{
+    z80Wait();
+    Z80_RESET = 0;                      /* back to reset, as at power-on */
+    Z80_BUSREQ = 0;
+}
+
+DSEC static u32 z80Now(void)
+{
+    u32 v;
+    z80Wait();
+    v = Z80_RAM[0x1F00] | (u32)Z80_RAM[0x1F01] << 8 | (u32)Z80_RAM[0x1F02] << 16 | (u32)Z80_RAM[0x1F03] << 24;
+    Z80_BUSREQ = 0;
+    return v;
+}
+
+DSEC static u32 toMs(u32 c)
+{
+    u32 r = (*(volatile u8 *)0xA10001 & 0x40) ? 63337 : 63920;     /* Z80 clock / 56 */
+    return (c / r) * 1000 + (c % r) * 1000 / r;
+}
+
+/* called by the probes in hooks.S (and by launch) */
+DSEC void diagEvent(u32 type, u32 a, u32 b)
+{
+    DiagEv *e;
+    if (!gRec)
+        return;
+    if (gNev && type == EV_WRITE && gEv[gNev - 1].type == EV_WRITE) {
+        gEv[gNev - 1].n++;
+        return;
+    }
+    if (gNev >= DMAX)
+        return;
+    e = &gEv[gNev++];
+    e->t = z80Now();
+    e->type = type;
+    e->a = a;
+    e->b = b;
+    e->n = 1;
+}
+
+DSEC static void diagBegin(void)
+{
+    gNev = 0;
+    gRec = 1;
+    shortName(gLastName, gCur.name, 38);
+    gLastSize = gCur.size;
+    z80Start();
+    diagEvent(EV_START, 0, 0);
+}
+
+DSEC static void diagRow(const DiagEv *e, u32 ms, u32 y)
+{
+    char h[8];
+    switch (e->type) {
+    case EV_STATUS: osPrintN(PLANE_A, (const char *)e->a, PAL0, 1, y, 26); break;
+    case EV_START: osPrint(PLANE_A, DS_start, PAL1, 1, y); break;
+    case EV_LOADED: osPrint(PLANE_A, DS_loaded, PAL1, 1, y); break;
+    case EV_LIST: osPrint(PLANE_A, DS_list, PAL1, 1, y); break;
+    case EV_CHECK: osPrint(PLANE_A, DS_check, PAL2, 1, y); break;
+    default:
+        osPrint(PLANE_A, e->type == EV_ERASE ? DS_erase : DS_write, PAL2, 1, y);
+        hex(h, e->a, 6);
+        osPrint(PLANE_A, h, PAL0, 8, y);
+        if (e->type == EV_ERASE)
+            osPrintNum(DS_empty, (e->b & 0xFFFF) >> 1, PAL0, 15, y);    /* 512-byte sectors -> KB */
+        else
+            osPrintNum(DS_x, e->n, PAL0, 15, y);
+    }
+    osPrintNum(DS_empty, ms, PAL0, 29, y);
+    osPrint(PLANE_A, DS_ms, PAL1, 36, y);
+}
+
+DSEC static void diagTimes(void)
+{
+    int i;
+    u32 copyMs = 0;
+    clearWithBanner();
+    osPrint(PLANE_A, DS_times, PAL2, 1, 3);
+    if (gNev < 2) {
+        osPrint(PLANE_A, DS_none, PAL0, 1, 5);
+    } else {
+        osPrintN(PLANE_A, gLastName, PAL0, 1, 4, 30);
+        osPrintNum(DS_kb, gLastSize >> 10, PAL1, 31, 4);
+        for (i = 0; i < gNev - 1 && i < 18; i++) {
+            u32 ms = toMs(gEv[i + 1].t - gEv[i].t);
+            diagRow(&gEv[i], ms, 6 + i);
+            if (gEv[i].type == EV_STATUS && (const char *)gEv[i].a == O_FF9682)  /* "copiando..." */
+                copyMs = ms;
+        }
+        osPrintNum(DS_total, toMs(gEv[gNev - 1].t - gEv[0].t), PAL2, 1, 24);
+        if (copyMs)
+            osPrintNum(DS_kbs, (gLastSize >> 10) * 1000 / copyMs, PAL2, 20, 24);
+    }
+    center(DS_play, PAL1, 26);
+    waitKey();
+}
+
+DSEC static u8 cfi(int k)
+{
+    return gFlash[4 + k - 0x10] & 0xFF;
+}
+
+DSEC static void diagChip(void)
+{
+    char h[24];
+    const char *nm;
+    int i, r, y = 12;
+    for (;;) {
+        clearWithBanner();
+        osPrint(PLANE_A, DS_title, PAL2, 1, 3);
+        ramFlashProbe(gFlash);
+        hex(h, gFlash[0], 4);
+        osPrint(PLANE_A, DS_manuf, PAL1, 1, 5);
+        osPrint(PLANE_A, h, PAL0, 13, 5);
+        for (nm = DS_names; *nm; nm += slen(nm + 1) + 2)
+            if ((u8)*nm == (gFlash[0] & 0xFF))
+                osPrint(PLANE_A, nm + 1, PAL0, 18, 5);
+        osPrint(PLANE_A, DS_dev, PAL1, 1, 6);
+        for (i = 1; i < 4; i++) {
+            hex(h, gFlash[i], 4);
+            osPrint(PLANE_A, h, PAL0, 9 + i * 5, 6);
+        }
+        osPrint(PLANE_A, gFlashMode() == 1 ? DS_mode1 : DS_mode2, PAL0, 18, 7);
+        osPrint(PLANE_A, DS_mode, PAL1, 1, 7);
+        osPrint(PLANE_A, (*(volatile u8 *)0xA10001 & 0x40) ? DS_pal : DS_ntsc, PAL1, 1, 8);
+        if (cfi(0x10) == 'Q' && cfi(0x11) == 'R' && cfi(0x12) == 'Y') {
+            osPrintNum(DS_size, 1UL << (cfi(0x27) - 10), PAL0, 1, 10);
+            osPrintNum(DS_buf, cfi(0x2A) ? 1UL << cfi(0x2A) : 0, PAL0, 1, 11);
+            osPrintNum(DS_tword, cfi(0x1F) ? 1UL << cfi(0x1F) : 0, PAL0, 1, 12);
+            osPrintNum(DS_tbuf, cfi(0x20) ? 1UL << cfi(0x20) : 0, PAL0, 1, 13);
+            osPrintNum(DS_terase, cfi(0x21) ? 1UL << cfi(0x21) : 0, PAL0, 1, 14);
+            osPrintNum(DS_regions, cfi(0x2C), PAL0, 1, 15);
+            for (r = 0, y = 16; r < cfi(0x2C) && r < 4; r++, y++) {
+                u32 n = ((u32)cfi(0x2E + 4 * r) << 8 | cfi(0x2D + 4 * r)) + 1;
+                u32 kb = (((u32)cfi(0x30 + 4 * r) << 8 | cfi(0x2F + 4 * r)) * 256) >> 10;
+                osPrintNum(DS_empty, n, PAL0, 2, y);
+                osPrint(PLANE_A, DS_x, PAL1, 7, y);
+                osPrintNum(DS_region, kb, PAL0, 8, y);
+            }
+        } else {
+            osPrint(PLANE_A, DS_nocfi, PAL0, 1, 10);
+            y = 12;
+        }
+        osPrint(PLANE_A, DS_raw, PAL1, 1, 20);
+        for (i = 0; i < 48; i++) {          /* 12 bytes per row: "xx xx xx ..." */
+            hex(h, cfi(0x10 + i), 2);
+            osPrint(PLANE_A, h, PAL0, 1 + (i % 12) * 3, 21 + i / 12);
+        }
+        center(DS_keys, PAL1, 26);
+        while (PAD)
+            ;
+        while (!PAD)
+            ;
+        if (PAD & BTN_A) {
+            while (PAD)
+                ;
+            diagTimes();
+            continue;
+        }
+        while (PAD)
+            ;
+        return;
+    }
+}
+#endif
+
 /* load (and optionally start) gCur; returns only when not started */
 static u8 launch(int start)
 {
@@ -370,12 +636,28 @@ static u8 launch(int start)
         info(S_too_small);
         return 1;
     }
+#ifdef DIAG
+    diagBegin();
+#endif
     e = osLoadGame(&gCur);
+#ifdef DIAG
+    diagEvent(EV_LOADED, 0, 0);
+#endif
     if (e) {
+#ifdef DIAG
+        gRec = 0;
+        z80Stop();
+#endif
         osError(S_prog_error, e);
         return e;
     }
     listAdd(0, &gCur);
+#ifdef DIAG
+    diagEvent(EV_LIST, 0, 0);
+    gRec = 0;
+    z80Stop();
+    diagTimes();
+#endif
     if (start)
         osStartGame(0);
     return 0;
@@ -746,9 +1028,11 @@ void myAbout(void)
         center(S_ab_dist, PAL1, 16);
         center((const char *)0x1C024, PAL0, 17);
         center((const char *)0x1C04C, PAL0, 18);
+#ifndef DIAG    /* the diagnostics build reuses the logo rows for its code */
         osLoadTiles((const void *)0x1CC20, 0x80, 120, 0);
         osSetPal(3, (const void *)0x1C200);
         osFillSeq(PLANE_A, PAL3 | 0x80, 0, 20, 40, 3);
+#endif
     }
     center(S_press_key, PAL1, 26);
     waitKey();
@@ -774,7 +1058,17 @@ void myMainMenu(void)
         memcpy(gItems, items, sizeof(items));
         scpy(scpy(gThemeItem, S_mm_theme), thm[gTheme & 3]);
         gItems[8] = gThemeItem;
+#ifdef DIAG
+        gItems[9] = DS_menu;
+        r = osMenu(gItems, 10, 2, gMainSel, 1);
+        if (r == 9) {
+            gMainSel = r;
+            diagChip();
+            continue;
+        }
+#else
         r = osMenu(gItems, 9, 2, gMainSel, 1);
+#endif
         if (r >= 9)
             continue;
         gMainSel = r;

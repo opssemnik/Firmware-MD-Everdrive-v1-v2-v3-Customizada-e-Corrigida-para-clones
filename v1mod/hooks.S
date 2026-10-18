@@ -65,6 +65,69 @@ ramIdle:                        /* browser waiting for input (was a PAD polling 
     bra.s   1b
 2:  rts
 
+#ifdef DIAG
+/* timing probes: entry of the status print, flash erase, flash write and checksum copy.
+ * Fallbacks run the displaced stock instructions and continue in the stock routine. */
+    .globl  ramDStatus
+ramDStatus:
+    CHECK   1f
+    jmp     dStatus
+1:  move.b  (0xFFE306).l, %d0
+    jmp     0xFF7F80
+
+    .globl  ramDErase
+ramDErase:
+    CHECK   1f
+    jmp     dErase
+1:  movem.l %d2-%d3/%a2, -(%sp)
+    movea.l 0x10(%sp), %a2
+    jmp     0xFF559A
+
+    .globl  ramDWrite
+ramDWrite:
+    CHECK   1f
+    jmp     dWrite
+1:  movem.l %d2-%d4/%a2, -(%sp)
+    move.l  0x18(%sp), %d2
+    jmp     0xFF57D8
+
+    .globl  ramDCheck
+ramDCheck:
+    CHECK   1f
+    jmp     dCheck
+1:  lea     -0x1c(%sp), %sp
+    movem.l %d2-%d5/%a2-%a3, -(%sp)
+    jmp     0xFF409C
+
+/* ramFlashProbe(u16 *out): out[0..3] = autoselect IDs (words 0, 1, 0xE, 0xF),
+ * out[4..51] = CFI words 0x10..0x3F. Runs from RAM: the flash array is unreadable meanwhile. */
+    .globl  ramFlashProbe
+ramFlashProbe:
+    movea.l 4(%sp), %a1
+    move.w  %sr, -(%sp)
+    ori.w   #0x0700, %sr
+    jsr     0xFF9288                /* VInt off */
+    move.w  #0xAA, (0xAAA).w
+    move.w  #0x55, (0x554).w
+    move.w  #0x90, (0xAAA).w
+    move.w  (0x0000).w, (%a1)+
+    move.w  (0x0002).w, (%a1)+
+    move.w  (0x001C).w, (%a1)+
+    move.w  (0x001E).w, (%a1)+
+    move.w  #0xF0, (0x0000).w       /* back to read array */
+    move.w  #0x98, (0x00AA).w       /* CFI query */
+    lea     (0x0020).w, %a0
+    moveq   #47, %d0
+2:  move.w  (%a0)+, (%a1)+
+    dbra    %d0, 2b
+    move.w  #0xF0, (0x0000).w
+    move.w  #0xFF, (0x0000).w       /* Intel-style chips return to read array with 0xFF */
+    move.w  #0xF0, (0x0000).w
+    jsr     0xFF9292                /* VInt on */
+    move.w  (%sp)+, %sr
+    rts
+#endif
+
     .globl  ramToolbox
 ramToolbox:                     /* toolbox; never return into a rewritten flash */
     jsr     0xFF7B68
@@ -98,6 +161,48 @@ aHook:
     jmp     0xFF6716
 .Ldir:
     rts
+
+#ifdef DIAG
+/* timing probe bodies (entered from the RAM stubs above): log the event, then run the stock code */
+dStatus:                            /* ff7f7a(msg) */
+    clr.l   -(%sp)
+    move.l  8(%sp), -(%sp)
+    pea     (1).w
+    jsr     diagEvent
+    lea     12(%sp), %sp
+    move.b  (0xFFE306).l, %d0
+    jmp     0xFF7F80
+
+dErase:                             /* ff5592(addr, size, wait) */
+    move.l  8(%sp), -(%sp)
+    move.l  8(%sp), -(%sp)
+    pea     (2).w
+    jsr     diagEvent
+    lea     12(%sp), %sp
+    movem.l %d2-%d3/%a2, -(%sp)
+    movea.l 0x10(%sp), %a2
+    jmp     0xFF559A
+
+dWrite:                             /* ff57d0(src, addr, sectors) */
+    move.l  12(%sp), -(%sp)
+    move.l  12(%sp), -(%sp)
+    pea     (3).w
+    jsr     diagEvent
+    lea     12(%sp), %sp
+    movem.l %d2-%d4/%a2, -(%sp)
+    move.l  0x18(%sp), %d2
+    jmp     0xFF57D8
+
+dCheck:                             /* ff4094(x) */
+    clr.l   -(%sp)
+    clr.l   -(%sp)
+    pea     (4).w
+    jsr     diagEvent
+    lea     12(%sp), %sp
+    lea     -0x1c(%sp), %sp
+    movem.l %d2-%d5/%a2-%a3, -(%sp)
+    jmp     0xFF409C
+#endif
 
 /* Browser idle wait. d3 = cursor index, d5 = key repeat counter (cleared while idle, as stock). */
 browseIdle:
