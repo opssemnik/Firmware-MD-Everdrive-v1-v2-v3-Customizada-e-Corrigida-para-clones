@@ -1,0 +1,10 @@
+# scripts executados no WSL precisam de LF
+*.sh text eol=lf
+*.S text eol=lf
+*.ld text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.BIN binary
+*.bin binary
+*.png binary
+*.ART binary

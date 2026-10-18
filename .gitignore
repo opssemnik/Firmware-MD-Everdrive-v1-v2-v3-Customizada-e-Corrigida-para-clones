@@ -1,0 +1,29 @@
+# Lista branca: só o que está liberado abaixo vai para o repositório.
+# ROMs, capas baixadas, firmwares originais (stock) e dumps nunca são publicados.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/CHANGELOG.md
+
+# firmwares compilados (mods)
+!/OS-V38-PTBR.BIN
+!/MDOS.ptbr.BIN
+
+# capas prontas (.ART) na mesma estrutura do cartão SD
+!/sd/
+
+# scripts de build e ferramentas
+!/build_v1_ptbr.py
+!/build_custom_mdos.py
+!/build_v3_dumper.py
+!/extract_sram_dump.py
+!/sync_roms_art.py
+
+# código-fonte do mod v1 (sem a pasta build/, que é gerada)
+!/v1mod/
+/v1mod/build/
+__pycache__/
+*.pyc
+/v1mod/test/sd/
+/v1mod/test/*.png
