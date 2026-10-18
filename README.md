@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `28640417df50783e50b428f96e3e0282acac49206c3fdd4c0419304a981a091a` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `1d1b4bbd3675e456e5ff06ec52af620926b27b32f093f80e040e5c32fd38cc1f` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `da4d6b6ff137706cce428c7f692f563ff77904d3130a6ef963b44e20bea94451` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `97da87e69b532e8b71cc133b9f28156ea9f9d2a0ee53d2aea531ec7affc8deb1` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -62,7 +62,7 @@ Menu do jogo: **Carregar e jogar**, **Só carregar**, **Adicionar aos favoritos*
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão aparece no rodapé (**PT-BR 1.4 OS v38**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.5**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -91,7 +91,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.2 OS v40**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.5**.
 
 ---
 
@@ -160,7 +160,7 @@ pip install unicorn==2.1.4 pillow capstone
 # gera um cartão SD de teste (FAT32) via mtools/dosfstools no WSL: mkimg.py + mkimg.sh
 python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py
 # v3 (emu3.py, mesmo emulador com BIOS do cartucho simulado)
-python t3_preview.py ; python t3_flows.py
+python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py
 ```
 
 **v3** — rode a partir da pasta acima de `mega-genesis/`:

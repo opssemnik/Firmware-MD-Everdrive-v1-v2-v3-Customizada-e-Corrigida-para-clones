@@ -5,6 +5,10 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.5 — 2026-10-18
+- Versão exibida só como **PT-BR 1.5** (rodapé do menu principal e Ferramentas → dispositivo),
+  mesma numeração da v3.
+
 ### 1.4 — 2026-10-18
 - **ESQ/DIR no menu do jogo** (botão A num jogo): vai para o jogo anterior/seguinte da pasta,
   pulando pastas e arquivos que não são ROM; ao sair, o cursor da lista fica nesse jogo.
@@ -51,6 +55,10 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.5 — 2026-10-18
+- Versão exibida só como **PT-BR 1.5** em Info Sistema (antes "PT-BR 1.2 OS v40"); a v3 pula de 1.2
+  para 1.5 para ficar com a mesma numeração da v1.
 
 ### 1.2 — 2026-10-18
 - **Correção: capa na lista não aparecia no cartucho.** A tela da v3 usa buffer duplo; a prévia

@@ -243,7 +243,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.2'      # shown in Info Sistema next to the OS version
+MOD_VERSION = '1.5'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -1445,9 +1445,9 @@ def build_custom_mdos():
     ext.label('str_bios_ver')
     ext.emit_str(b'Vers\x81o BIOS:')
     ext.label('str_os_ver')
-    label = ('PT-BR ' + MOD_VERSION).ljust(11) + 'OS v'    # the number is printed at a fixed column
-    assert len(label) == 15, label
-    ext.emit_str(label.encode())
+    ext.emit_str(b'Vers\x81o OS:')
+    ext.label('str_mod_version')
+    ext.emit_str(('PT-BR ' + MOD_VERSION).encode())
     ext.label('str_mk_mode')
     ext.emit_str(b'Modo MegaKey:')
     ext.label('str_sys_type')
@@ -1802,11 +1802,13 @@ def build_custom_mdos():
         assert cur == old_val, f"At 0x{file_off:04x}: expected 0x{old_val:08x}, got 0x{cur:08x}"
         struct.pack_into('>I', rom, file_off, new_val)
 
-    # 0. Update OS Version byte at 0x0011 to 0x02 & set deviceInfo (0x4C5C) to display 40 ("v40")
+    # 0. Update OS Version byte at 0x0011 to 0x02 & show the mod version in deviceInfo (0x4C5C)
     assert rom[0x0010:0x0014] == bytes.fromhex('00010300')
     rom[0x0011] = 0x02
-    assert rom[0x4C5C:0x4C64] == bytes.fromhex('7000303900ffc47e')
-    rom[0x4C5C:0x4C64] = bytes.fromhex('70284e714e714e71')  # moveq #40, d0; nop; nop; nop
+    # deviceInfo: the OS version number (move.w $ffc47e,d0; push; jsr (a4)) becomes the mod version
+    # string at the same column: pea str_mod_version.l; jsr gPrintAt (x and y are already pushed)
+    assert rom[0x4C5C:0x4C68] == bytes.fromhex('7000303900ffc47e2f004e94')
+    struct.pack_into('>HIHI', rom, 0x4C5C, 0x4879, all_labels['str_mod_version'], 0x4EB9, 0xFF3556)
 
     # A. Hook printFolder top bar (0x0A50: movea.l $ffc46c.l, a0 -> jsr draw_top_banner.l)
     assert rom[0x0A50:0x0A56] == bytes.fromhex('207900ffc46c')
