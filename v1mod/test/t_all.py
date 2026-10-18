@@ -35,6 +35,10 @@ if step in ('all', 'recent'):
     m = new(F); m.press('down'); m.press('down'); m.press('a', after=200)
     show(m, 'recent list'); m.screen('shot_recent.png')
     m.press('a', after=900); print('recent play ->', m.stopped, '|', ' / '.join(l.strip() for l in m.text().splitlines() if l.strip())[:120])
+if step in ('all', 'clear'):
+    m = new(F); m.press('down'); m.press('down'); m.press('a', after=200)
+    m.press('down'); show(m, 'recent list, cursor on Limpar recentes')
+    m.press('a', after=900); show(m, 'after Limpar recentes'); print('lists:', lists(m))
 if step in ('all', 'fav'):
     m = new(F); [m.press('down') for _ in range(3)]; m.press('a', after=200)
     show(m, 'fav list'); m.press('a', after=150); show(m, 'fav submenu'); m.screen('shot_favsub.png')

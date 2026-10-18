@@ -5,6 +5,11 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.6 — 2026-10-18
+- Só ROMs (`.bin .md .gen .smd .sms .32x`) entram nos **Jogos recentes**: um `.rar` ou outro
+  arquivo carregado por engano não aparece mais na lista.
+- **Limpar recentes**: último item da lista de recentes; apaga só os recentes (favoritos e opções ficam).
+
 ### 1.5 — 2026-10-18
 - Versão exibida só como **PT-BR 1.5** (rodapé do menu principal e Ferramentas → dispositivo),
   mesma numeração da v3.
@@ -55,6 +60,15 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.6 — 2026-10-18
+- **"Pág. x de y" embaixo**, logo acima da barra com o nome do arquivo, como na v1. A barra de cima
+  fica só com o banner.
+- **Menu do arquivo em tela cheia** (igual à v1): banner, nome do jogo centralizado, menu e capa;
+  a lista não aparece mais por trás. ESQ/DIR troca de jogo e atualiza o nome.
+- Só ROMs entram nos **Jogos Recentes**; o **Jogo Aleatório** também só sorteia ROMs.
+- **Limpar recentes**: último item da lista de recentes.
+- A lista de recentes/favoritos foi reescrita menor, para abrir espaço para isso.
 
 ### 1.5 — 2026-10-18
 - Versão exibida só como **PT-BR 1.5** em Info Sistema (antes "PT-BR 1.2 OS v40"); a v3 pula de 1.2

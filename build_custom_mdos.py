@@ -68,12 +68,29 @@ class Asm68k:
         self.emit(0x51c8 | dreg, 0x0000)
         self.fixups.append((len(self.buf) - 2, target_label, 'w16'))
 
+    def b_s(self, cc, target_label):
+        """short branch: cc = 0x60 bra, 0x61 bsr, 0x65 bcs, 0x66 bne, 0x67 beq ..."""
+        self.emit(cc << 8)
+        self.fixups.append((len(self.buf) - 1, target_label, 'b8'))
+
+    def dbeq(self, dreg, target_label):
+        self.emit(0x57c8 | dreg, 0x0000)
+        self.fixups.append((len(self.buf) - 2, target_label, 'w16'))
+
+    def lea_pc(self, areg, target_label):
+        self.emit(0x41fa | (areg << 9), 0x0000)
+        self.fixups.append((len(self.buf) - 2, target_label, 'w16'))
+
     def pea_label(self, target_label):
         self.emit(0x4879, 0x0000, 0x0000)
         self.fixups.append((len(self.buf) - 4, target_label, 'abs32'))
 
     def lea_label(self, areg, target_label):
         self.emit(0x41f9 | (areg << 9), 0x0000, 0x0000)
+        self.fixups.append((len(self.buf) - 4, target_label, 'abs32'))
+
+    def jmp_label(self, target_label):
+        self.emit(0x4ef9, 0x0000, 0x0000)
         self.fixups.append((len(self.buf) - 4, target_label, 'abs32'))
 
     def jsr_label(self, target_label):
@@ -90,6 +107,10 @@ class Asm68k:
                 disp = target - (self.base + off)
                 assert -32768 <= disp <= 32767, f"Disp out of range for {name}: {disp}"
                 struct.pack_into('>h', self.buf, off, disp)
+            elif kind == 'b8':
+                disp = target - (self.base + off + 1)
+                assert -128 <= disp <= 127 and disp not in (0, -1), f"Short disp out of range for {name}: {disp}"
+                struct.pack_into('>b', self.buf, off, disp)
             elif kind == 'abs32':
                 struct.pack_into('>I', self.buf, off, target)
 
@@ -243,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.5'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.6'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -376,7 +397,7 @@ def build_custom_mdos():
     blk3.emit(0x4a40)                               # tst.w d0
     blk3.bne_w('loadRomRecent_exit')
     blk3.emit(0x2f2f, 0x0004)                       # move.l $4(a7), -(a7) (fat_rec)
-    blk3.jsr_label('addRecentlyPlayed')
+    blk3.jsr_label('addRecentIfRom')
     blk3.emit(0x588f)                               # addq.l #4, a7
     blk3.emit(0x7000)                               # moveq #0, d0
     blk3.label('loadRomRecent_exit')
@@ -403,6 +424,7 @@ def build_custom_mdos():
     blk3.emit(0x2068, 0x3016)                       # movea.l $3016(a0), a0 (dir entry ptr)
     blk3.emit(0x4a68, 0x000a)                       # tst.w $a(a0) (0 = file, !=0 = dir)
     blk3.beq_w('rand_found')
+    blk3.label('rand_skip')
     blk3.emit(0x5243)                               # addq.w #1, d3
     blk3.emit(0xb642)                               # cmp.w d2, d3
     blk3.bcs_w('rand_next')
@@ -426,6 +448,9 @@ def build_custom_mdos():
     blk3.emit(0x508f)                               # addq.l #8, a7
     blk3.emit(0x4a00)                               # tst.b d0
     blk3.bne_w('rand_exit')
+    blk3.emit(0x41f9, 0x00ff, 0xc800)               # lea.l $ffc800.l, a0
+    blk3.jsr_label('isRomRec')                      # only ROMs (no .txt/.rar/saves)
+    blk3.bne_w('rand_skip')
     blk3.emit(0x4879, 0x00ff, 0xc800)               # pea.l $ffc800.l
     blk3.bsr_w('loadRomWithRecent')
     blk3.emit(0x588f)                               # addq.l #4, a7
@@ -460,20 +485,22 @@ def build_custom_mdos():
 
     # 2. clear_recent_sram (first boot SRAM init)
     ext.label('clear_recent_sram')
-    ext.emit(0x48e7, 0x3030)                        # movem.l d2-d3/a2-a3, -(a7)
     ext.emit(0x2079, 0x00ff, 0xc47a)                # movea.l $ffc47a.l, a0
     ext.emit(0x4268, 0x000c)                        # clr.w $c(a0) (default Theme = 0)
-    ext.emit(0x47f9, 0x00ff, 0xc500)                # lea.l $ffc500.l, a3
-    ext.emit(0x7613)                                # moveq #19, d3 (20 slots)
-    ext.label('clr_recent_slot')
-    ext.emit(0x205b)                                # movea.l (a3)+, a0
-    ext.emit(0x303c, 0x010f)                        # move.w #$10f, d0
-    ext.label('clr_recent_word')
-    ext.emit(0x4258)                                # clr.w (a0)+
-    ext.dbra(0, 'clr_recent_word')
-    ext.dbra(3, 'clr_recent_slot')
-    ext.emit(0x4cdf, 0x0c0c)                        # movem.l (a7)+, d2-d3/a2-a3
+    ext.emit(0x43f9, 0x00ff, 0xc500)                # lea.l $ffc500.l, a1
+    ext.emit(0x7213)                                # moveq #19, d1 (20 slots)
+    ext.b_s(0x61, 'clr_slots')
     ext.emit(0x4ef9, 0x00ff, 0x37e6)                # jmp $ff37e6.l
+
+    # clr_slots(a1 = slot pointer table, d1 = slots - 1): zero the SRAM records
+    ext.label('clr_slots')
+    ext.emit(0x2059)                                # movea.l (a1)+, a0
+    ext.emit(0x303c, 0x010f)                        # move.w #$10f, d0
+    ext.label('clr_slot_word')
+    ext.emit(0x4258)                                # clr.w (a0)+
+    ext.dbra(0, 'clr_slot_word')
+    ext.dbra(1, 'clr_slots')
+    ext.emit(0x4e75)                                # rts
 
     # 3. boot_init_vram_and_theme (runs on every boot at 0xFF63E2)
     ext.label('boot_init_vram_and_theme')
@@ -594,137 +621,93 @@ def build_custom_mdos():
     ext.emit(0x203c, 0x00ff, 0xc528)                # move.l #$ffc528, d0
 
     ext.label('slotListMenu')
-    ext.emit(0x4fef, 0xfd4c)                        # lea.l -$2b4(a7), a7
-    ext.emit(0x23c9, 0x00ff, 0xc578)                # move.l a1, $ffc578.l
-    ext.emit(0x48e7, 0x3830)                        # movem.l d2-d4/a2-a3, -(a7)
-    ext.emit(0x2640)                                # movea.l d0, a3
-    ext.emit(0x2f48, 0x0016)                        # move.l a0, $16(a7)
-    ext.emit(0x42af, 0x0042)                        # clr.l $42(a7)
-    ext.emit(0x4243)                                # clr.w d3
-    ext.emit(0x93c9)                                # suba.l a1, a1
-    ext.label('rp_init_ptrs')
-    ext.emit(0x2003)                                # move.l d3, d0
-    ext.emit(0xe588)                                # lsl.l #2, d0
-    ext.emit(0x0280, 0x0003, 0xfffc)                # andi.l #$3fffc, d0
-    ext.emit(0x41ef, 0x02c8)                        # lea.l $2c8(a7), a0
-    ext.emit(0xd1c0)                                # adda.l d0, a0
-    ext.emit(0x7046)                                # moveq #$46, d0
-    ext.emit(0xd08f)                                # add.l a7, d0
-    ext.emit(0xd089)                                # add.l a1, d0
-    ext.emit(0x2140, 0xfd52)                        # move.l d0, -$2ae(a0)
-    ext.emit(0x5243)                                # addq.w #1, d3
-    ext.emit(0x43e9, 0x0025)                        # lea.l $25(a1), a1
-    ext.emit(0x0c43, 0x0009)                        # cmpi.w #9, d3
-    ext.bls_w('rp_init_ptrs')
-
-    ext.emit(0x4243)                                # clr.w d3
-    ext.label('rp_read_slot')
+    # frame: 0 menu title, 4 item ptrs (10 + "Limpar recentes"), 52 fat_rec, 324 names 10 x 37,
+    # 694 "list empty" menu
+    ext.emit(0x48e7, 0x3838)                        # movem.l d2-d4/a2-a4, -(a7)
+    ext.emit(0x4fef, 0xfd46)                        # lea.l -698(a7), a7
+    ext.emit(0x2e88)                                # move.l a0, (a7) (title)
+    ext.emit(0x2f49, 694)                           # move.l a1, 694(a7)
+    ext.emit(0x2640)                                # movea.l d0, a3 (slot table)
+    ext.label('sl_restart')
+    ext.emit(0x45ef, 0x0004)                        # lea.l 4(a7), a2 (item ptrs)
+    ext.emit(0x49ef, 324)                           # lea.l 324(a7), a4 (names)
+    ext.emit(0x7600)                                # moveq #0, d3 (count)
+    ext.label('sl_read')
+    ext.emit(0x3003, 0xe548)                        # move.w d3, d0 ; lsl.w #2, d0
     ext.emit(0x4878, 0x0110)                        # pea.l $110.w
-    ext.emit(0x280f)                                # move.l a7, d4
-    ext.emit(0x0684, 0x0000, 0x01bc)                # addi.l #$1bc, d4
-    ext.emit(0x2f04)                                # move.l d4, -(a7)
-    ext.emit(0x2003)                                # move.l d3, d0
-    ext.emit(0xe588)                                # lsl.l #2, d0
-    ext.emit(0x0280, 0x0003, 0xfffc)                # andi.l #$3fffc, d0
-    ext.emit(0x2f33, 0x0800)                        # move.l (a3, d0.l), -(a7)
-    ext.lea_label(2, 'sramReadBytes')
-    ext.emit(0x4e92)                                # jsr (a2)
+    ext.emit(0x486f, 56)                            # pea.l 56(a7) (fat_rec)
+    ext.emit(0x2f33, 0x0000)                        # move.l (a3, d0.w), -(a7)
+    ext.jsr_label('sramReadBytes')
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ext.emit(0x4a2f, 0x01c6)                        # tst.b $1c6(a7)
-    ext.beq_w('rp_slot_empty')
-
-    ext.emit(0x4242)                                # clr.w d2
-    ext.label('rp_copy_name')
-    ext.emit(0x2003)                                # move.l d3, d0
-    ext.emit(0xe588)                                # lsl.l #2, d0
-    ext.emit(0x0280, 0x0003, 0xfffc)                # andi.l #$3fffc, d0
-    ext.emit(0x41ef, 0x02c8)                        # lea.l $2c8(a7), a0
-    ext.emit(0xd1c0)                                # adda.l d0, a0
-    ext.emit(0x2268, 0xfd52)                        # movea.l -$2ae(a0), a1
-    ext.emit(0x7000)                                # moveq #0, d0
-    ext.emit(0x3002)                                # move.w d2, d0
-    ext.emit(0x4281)                                # clr.l d1
-    ext.emit(0x3202)                                # move.w d2, d1
-    ext.emit(0x41ef, 0x02c8)                        # lea.l $2c8(a7), a0
-    ext.emit(0xd1c1)                                # adda.l d1, a0
-    ext.emit(0x13a8, 0xfefe, 0x0800)                # move.b -$102(a0), (a1, d0.l)
-    ext.emit(0x7000)                                # moveq #0, d0
-    ext.emit(0x3002)                                # move.w d2, d0
-    ext.emit(0x4a31, 0x0800)                        # tst.b (a1, d0.l)
-    ext.beq_w('rp_name_done')
-    ext.emit(0x0c42, 0x0021)                        # cmpi.w #$21, d2
-    ext.bne_w('rp_name_next')
-    ext.emit(0x137c, 0x002e, 0x0021)                # move.b #$2e, $21(a1)
-    ext.emit(0x137c, 0x002e, 0x0022)                # move.b #$2e, $22(a1)
-    ext.emit(0x137c, 0x002e, 0x0023)                # move.b #$2e, $23(a1)
-    ext.emit(0x4229, 0x0024)                        # clr.b $24(a1)
-    ext.bra_w('rp_name_done')
-    ext.label('rp_name_next')
-    ext.emit(0x5242)                                # addq.w #1, d2
-    ext.bra_w('rp_copy_name')
-
-    ext.label('rp_name_done')
+    ext.emit(0x4a2f, 66)                            # tst.b 66(a7) (name)
+    ext.b_s(0x67, 'sl_done')
+    ext.emit(0x24cc)                                # move.l a4, (a2)+
+    ext.emit(0x41ef, 66)                            # lea.l 66(a7), a0
+    ext.emit(0x7020)                                # moveq #32, d0 (33 chars)
+    ext.label('sl_copy')
+    ext.emit(0x18d8)                                # move.b (a0)+, (a4)+
+    ext.dbeq(0, 'sl_copy')
+    ext.b_s(0x67, 'sl_next')
+    ext.emit(0x702e)                                # moveq #'.', d0 (long name: "...")
+    ext.emit(0x18c0, 0x18c0, 0x18c0)                # move.b d0, (a4)+ x3
+    ext.emit(0x4214)                                # clr.b (a4)
+    ext.label('sl_next')
+    ext.emit(0x286a, 0xfffc)                        # movea.l -4(a2), a4
+    ext.emit(0x49ec, 37)                            # lea.l 37(a4), a4
     ext.emit(0x5243)                                # addq.w #1, d3
-    ext.emit(0x0c43, 0x0009)                        # cmpi.w #9, d3
-    ext.bls_w('rp_read_slot')
-    ext.bra_w('rp_check_count')
-
-    ext.label('rp_slot_empty')
-    ext.emit(0x2003)                                # move.l d3, d0
-    ext.emit(0xe588)                                # lsl.l #2, d0
-    ext.emit(0x0280, 0x0003, 0xfffc)                # andi.l #$3fffc, d0
-    ext.emit(0x41ef, 0x02c8)                        # lea.l $2c8(a7), a0
-    ext.emit(0xd1c0)                                # adda.l d0, a0
-    ext.emit(0x42a8, 0xfd52)                        # clr.l -$2ae(a0)
-
-    ext.label('rp_check_count')
-    ext.emit(0x7000)                                # moveq #0, d0
-    ext.emit(0x3003)                                # move.w d3, d0
-    ext.emit(0x7216)                                # moveq #$16, d1
-    ext.emit(0xd28f)                                # add.l a7, d1
-    ext.emit(0x4aaf, 0x001a)                        # tst.l $1a(a7)
-    ext.bne_w('rp_show_menu')
-
+    ext.emit(0x0c43, 10)                            # cmpi.w #10, d3
+    ext.b_s(0x65, 'sl_read')
+    ext.label('sl_done')
+    ext.emit(0x4292)                                # clr.l (a2)
+    ext.emit(0x7800, 0x3803)                        # moveq #0, d4 ; move.w d3, d4 (items)
+    ext.b_s(0x67, 'sl_empty')
+    ext.emit(0xb7fc, 0x00ff, 0xc500)                # cmpa.l #$ffc500, a3 (recent list?)
+    ext.b_s(0x66, 'sl_show')
+    ext.emit(0x24bc, 0, 0)                          # move.l #str_clear_recent, (a2)
+    ext.fixups.append((len(ext.buf) - 4, 'str_clear_recent', 'abs32'))
+    ext.emit(0x42aa, 0x0004)                        # clr.l 4(a2)
+    ext.emit(0x5244)                                # addq.w #1, d4
+    ext.label('sl_show')
     ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x4878, 0x0001)                        # pea.l $1.w
-    ext.emit(0x2f39, 0x00ff, 0xc578)                # move.l $ffc578.l, -(a7)
+    ext.emit(0x2f04)                                # move.l d4, -(a7)
+    ext.emit(0x486f, 0x0008)                        # pea.l 8(a7) (menu)
     ext.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
     ext.emit(0x7200)                                # moveq #0, d1
-    ext.bra_w('rp_exit')
-
-    ext.label('rp_show_menu')
-    ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x2f00)                                # move.l d0, -(a7)
-    ext.emit(0x2f01)                                # move.l d1, -(a7)
-    ext.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
-    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ext.emit(0x7200)                                # moveq #0, d1
-    ext.emit(0x0c00, 0xffff)                        # cmpi.b #$ff, d0
-    ext.beq_w('rp_exit')
-
+    ext.emit(0x0c00, 0x00ff)                        # cmpi.b #$ff, d0 (B)
+    ext.b_s(0x67, 'sl_exit')
+    ext.emit(0xb043)                                # cmp.w d3, d0 ("Limpar recentes"?)
+    ext.b_s(0x67, 'sl_clear')
+    ext.emit(0x0240, 0x000f, 0xe548)                # andi.w #$f, d0 ; lsl.w #2, d0
     ext.emit(0x4878, 0x0110)                        # pea.l $110.w
-    ext.emit(0x2f04)                                # move.l d4, -(a7)
-    ext.emit(0xe588)                                # lsl.l #2, d0
-    ext.emit(0x0280, 0x0000, 0x03fc)                # andi.l #$3fc, d0
-    ext.emit(0x2f33, 0x0800)                        # move.l (a3, d0.l), -(a7)
-    ext.emit(0x4e92)                                # jsr (a2) (sramReadBytes)
+    ext.emit(0x486f, 56)                            # pea.l 56(a7) (fat_rec)
+    ext.emit(0x2f33, 0x0000)                        # move.l (a3, d0.w), -(a7)
+    ext.jsr_label('sramReadBytes')
     ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x2f04)                                # move.l d4, -(a7)
+    ext.emit(0x486f, 68)                            # pea.l 68(a7) (fat_rec)
     ext.emit(0x4eb9, 0x00ff, 0x5f22)                # jsr $ff5f22.l (loadRom)
     ext.emit(0x4fef, 0x0014)                        # lea.l $14(a7), a7
-    ext.emit(0x4281)                                # clr.l d1
-    ext.emit(0x1200)                                # move.b d0, d1
-    ext.emit(0x4a00)                                # tst.b d0
-    ext.bne_w('rp_exit')
+    ext.emit(0x7200, 0x1200)                        # moveq #0, d1 ; move.b d0, d1
+    ext.b_s(0x66, 'sl_exit')
     ext.emit(0x4eb9, 0x00ff, 0x567e)                # jsr $ff567e.l (startGame)
-    ext.emit(0x4281)                                # clr.l d1
-    ext.emit(0x1200)                                # move.b d0, d1
-
-    ext.label('rp_exit')
+    ext.emit(0x7200, 0x1200)                        # moveq #0, d1 ; move.b d0, d1
+    ext.b_s(0x60, 'sl_exit')
+    ext.label('sl_clear')
+    ext.emit(0x224b)                                # movea.l a3, a1
+    ext.emit(0x7209)                                # moveq #9, d1
+    ext.bsr_w('clr_slots')
+    ext.bra_w('sl_restart')                         # now empty: shows "Nenhum jogo recente"
+    ext.label('sl_empty')
+    ext.emit(0x42a7)                                # clr.l -(a7)
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w
+    ext.emit(0x2f2f, 694 + 8)                       # move.l 702(a7), -(a7)
+    ext.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x7200)                                # moveq #0, d1
+    ext.label('sl_exit')
     ext.emit(0x2001)                                # move.l d1, d0
-    ext.emit(0x4cdf, 0x0c1c)                        # movem.l (a7)+, d2-d4/a2-a3
-    ext.emit(0x4fef, 0x02b4)                        # lea.l $2b4(a7), a7
+    ext.emit(0x4fef, 698)                           # lea.l 698(a7), a7
+    ext.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
     ext.emit(0x4e75)                                # rts
 
     # 7. calcRomArtPath(fat_rec in a4)
@@ -798,27 +781,49 @@ def build_custom_mdos():
     ext.emit(0x4cdf, 0x040c)                        # movem.l (a7)+, d2-d3/a2
     ext.emit(0x4e75)                                # rts
 
+    # 8a. clsTitle(a4 = fat_rec): blank screen, banner, game name centred on row 3 (max 38 chars)
+    ext.label('clsTitle')
+    ext.b_s(0x61, 'clsBanner')
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (Pal 1 gold)
+    ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
+    ext.emit(0x41ec, 0x000e)                        # lea.l $e(a4), a0 (name)
+    ext.emit(0x43f9, 0x00ff, 0xd720)                # lea.l $ffd720.l, a1 (free RAM)
+    ext.emit(0x7025)                                # moveq #37, d0
+    ext.label('ct_copy')
+    ext.emit(0x12d8)                                # move.b (a0)+, (a1)+
+    ext.dbeq(0, 'ct_copy')
+    ext.emit(0x4211)                                # clr.b (a1)
+    ext.emit(0x4878, 0x0003)                        # pea.l $3.w (y=3)
+    ext.emit(0x4879, 0x00ff, 0xd720)                # pea.l $ffd720.l
+    ext.emit(0x4eb9, 0x00ff, 0x35fe)                # jsr $ff35fe.l (gPrintCenter)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x4e75)                                # rts
+
+    # 8b. clsBanner: blank screen + RETROGAMER POA banner (palette left at 2)
+    ext.label('clsBanner')
+    ext.emit(0x4eb9, 0x00ff, 0x3802)                # jsr $ff3802.l (gCleanPlan)
+    ext.emit(0x4878, 0x0002)                        # pea.l $2.w (Pal 2)
+    ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (y=1)
+    ext.emit(0x4878, 0x000c)                        # pea.l $c.w (x=12, centred)
+    ext.pea_label('str_banner_tiles')
+    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
+    ext.emit(0x4fef, 0x0010)                        # lea.l $10(a7), a7
+    ext.emit(0x4e75)                                # rts
+
     # 8. showRomInfo (Compact table-driven ROM Header Info screen)
     ext.label('showRomInfo')
     ext.emit(0x48e7, 0x3838)                        # movem.l d2-d4/a2-a4, -(a7)
     ext.emit(0x286f, 0x001c)                        # movea.l $1c(a7), a4 (fat_rec)
     ext.bsr_w('calcRomArtPath')
-    ext.emit(0x4eb9, 0x00ff, 0x3802)                # jsr $ff3802.l (gCleanPlan)
+    ext.bsr_w('clsBanner')
     ext.emit(0x45f9, 0x00ff, 0x3556)                # lea.l $ff3556.l, a2 (gPrintAt)
     ext.emit(0x47f9, 0x00ff, 0x30a0)                # lea.l $ff30a0.l, a3 (gSetPal)
-
-    # Top Banner + Title
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w (Pal 2)
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (y=1)
-    ext.emit(0x4878, 0x000c)                        # pea.l $c.w (x=12, centred)
-    ext.pea_label('str_banner_tiles')
-    ext.emit(0x4e92)                                # jsr (a2)
     ext.emit(0x4878, 0x0003)                        # pea.l $3.w (y=3)
     ext.emit(0x4878, 0x0006)                        # pea.l $6.w (x=6)
     ext.pea_label('str_ri_title')
     ext.emit(0x4e92)                                # jsr (a2)
-    ext.emit(0x4fef, 0x001c)                        # lea.l $1c(a7), a7
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
 
     # Loop over 8 entries in ri_table (each entry = 8 bytes: word y, word max_len, word hdr_off, word lbl_off)
     ext.lea_label(4, 'ri_table')                    # lea ri_table, a4
@@ -1006,6 +1011,7 @@ def build_custom_mdos():
     ext.emit(0x48e7, 0x3e38)                        # movem.l d2-d6/a2-a4, -(a7)
     ext.emit(0x286f, 0x0024)                        # movea.l $24(a7), a4 (fat_rec)
     ext.label('rfm_restart')
+    ext.bsr_w('clsTitle')                           # full screen, like the v1 game menu
     ext.bsr_w('loadArtVram')
     ext.emit(0x4a00)                                # tst.b d0
     ext.bne_w('rfm_draw_menu')
@@ -1400,6 +1406,11 @@ def build_custom_mdos():
     ext.emit_str(b'Menu Principal')
     ext.label('str_recent_title')
     ext.emit_str(b'Jogos Recentes')
+    ext.label('str_clear_recent')
+    ext.emit_str(b'Limpar recentes')
+    ext.label('ir_exts')                            # isRomRec: 1 marker + lower-case extension
+    for e in ('bin', 'md', 'gen', 'smd', 'sms', '32x'):
+        ext.emit_l(int.from_bytes(b'\x01' + e.encode(), 'big'))
     ext.label('str_no_recent')
     ext.emit_str(b'Nenhum jogo recente')
     ext.label('str_fav_title')
@@ -1644,6 +1655,45 @@ def build_custom_mdos():
     opt_asm.emit(0x4e75)                            # rts
 
 
+    # ---- (free space after optionsMenu_v2)
+    # addRecentIfRom(fat_rec): loading a .rar/.txt from the browser must not enter the recents
+    opt_asm.label('addRecentIfRom')
+    opt_asm.emit(0x206f, 0x0004)                        # movea.l $4(a7), a0
+    opt_asm.b_s(0x61, 'isRomRec')                       # bsr.s isRomRec
+    opt_asm.b_s(0x66, 'ir_ret')                         # bne.s: not a ROM
+    opt_asm.jmp_label('addRecentlyPlayed')
+
+    # isRomRec(a0 = fat_rec) -> Z = 1 for a ROM: the extension after the last dot (lower case,
+    # max 3 chars, packed behind a 1 marker) is in ir_exts; no dot at all counts as a ROM
+    # (the OS truncates long names that cross a directory sector). Uses d0-d1/a0-a1.
+    opt_asm.label('isRomRec')
+    opt_asm.emit(0x41e8, 0x000e)                        # lea.l $e(a0), a0 (name)
+    opt_asm.emit(0x7200)                                # moveq #0, d1
+    opt_asm.label('ir_loop')
+    opt_asm.emit(0x1018)                                # move.b (a0)+, d0
+    opt_asm.b_s(0x67, 'ir_end')
+    opt_asm.emit(0x0c00, 0x002e)                        # cmpi.b #'.', d0
+    opt_asm.b_s(0x66, 'ir_char')
+    opt_asm.emit(0x7201)                                # moveq #1, d1 (marker)
+    opt_asm.b_s(0x60, 'ir_loop')
+    opt_asm.label('ir_char')
+    opt_asm.emit(0x4a81)                                # tst.l d1 (before the first dot?)
+    opt_asm.b_s(0x67, 'ir_loop')
+    opt_asm.emit(0xe189)                                # lsl.l #8, d1
+    opt_asm.emit(0x0000, 0x0020)                        # ori.b #$20, d0 (lower case)
+    opt_asm.emit(0x1200)                                # move.b d0, d1
+    opt_asm.b_s(0x60, 'ir_loop')
+    opt_asm.label('ir_end')
+    opt_asm.emit(0x4a81)                                # tst.l d1
+    opt_asm.b_s(0x67, 'ir_ret')
+    opt_asm.lea_label(1, 'ir_exts')
+    opt_asm.emit(0x7005)                                # moveq #5, d0
+    opt_asm.label('ir_cmp')
+    opt_asm.emit(0xb299)                                # cmp.l (a1)+, d1
+    opt_asm.dbeq(0, 'ir_cmp')
+    opt_asm.label('ir_ret')
+    opt_asm.emit(0x4e75)                                # rts
+
     # =========================================================================
     # blkA / blkB: old English strings that every reference was moved away from
     #   0xFF6854..0xFF68D0 ("File Menu" .. "ROM file must be unzipped")
@@ -1826,11 +1876,10 @@ def build_custom_mdos():
     struct.pack_into('>HIHhHH', rom, 0x499E, 0x4EB9, all_labels['menuLR'], 0x6700,
                      0xFF48F2 - (0xFF49A4 + 2), 0x4E71, 0x4E71)
 
-    # B4. Browser header: 2-row top bar (fills at 0x095C/0x0996 h=1 -> 2), page text on row 2,
-    #     so the 16-tile banner can sit centred on row 1.
-    for off in (0x095C, 0x0996, 0x09E2):
-        assert rom[off:off + 4] == bytes.fromhex('48780001'), hex(off)
-        rom[off + 3] = 0x02
+    # B4. Browser page counter ("Pág. x de y") moves from the top bar to row 24, just above the
+    #     file name bar (like the v1); the top bar keeps only the centred banner.
+    assert rom[0x09E2:0x09E6] == bytes.fromhex('48780001')
+    rom[0x09E5] = 24
 
     # C. Hook browser C-button Main Menu call (0x0FF0) -> call_mainMenu_from_browser
     patch_long(0x0FF2, 0x00FF50BC, all_labels['call_mainMenu_from_browser'])

@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `da4d6b6ff137706cce428c7f692f563ff77904d3130a6ef963b44e20bea94451` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `97da87e69b532e8b71cc133b9f28156ea9f9d2a0ee53d2aea531ec7affc8deb1` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `0c5be46120f31080bd4c77bc21b66977c023241e3f85cb2fd0ad4a0dfc22ca5c` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `3006b204b40092a08028d7e9da14cf58d74171b4fb6e66b02b70236c190e842e` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -22,7 +22,8 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 
 - **Tudo em português**, com acentos (á à â ã é ê í ó ô õ ú ç) desenhados no estilo da fonte original
 - **Banner "RETROGAMER POA"** nos menus e tela de créditos com o grupo
-- **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar)
+- **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
+  nos recentes; o último item da lista, **Limpar recentes**, apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
 - **Capas (box art)** dos jogos, lidas de `/EDMD/ART` no cartão SD
 - **Info da ROM**: nome, console, copyright, serial, região, checksum e tamanho lidos do cabeçalho SEGA
@@ -62,7 +63,7 @@ Menu do jogo: **Carregar e jogar**, **Só carregar**, **Adicionar aos favoritos*
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.5**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.6**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -82,7 +83,7 @@ O v3 carrega o OS do cartão SD. Renomeie `MDOS.ptbr.BIN` para **`MDOS.BIN`** e 
 |---|---|
 | Esquerda / Direita | troca de página |
 | START | repete o último jogo |
-| **A** | menu do arquivo + capa (Carregar e Jogar, Só Carregar, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
+| **A** | menu do arquivo em tela cheia, com o nome do jogo e a capa (Carregar e Jogar, Só Carregar, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
 | B | volta |
 | **C** | menu principal (Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos) |
 
@@ -91,7 +92,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.5**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.6**.
 
 ---
 
@@ -160,7 +161,7 @@ pip install unicorn==2.1.4 pillow capstone
 # gera um cartão SD de teste (FAT32) via mtools/dosfstools no WSL: mkimg.py + mkimg.sh
 python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py
 # v3 (emu3.py, mesmo emulador com BIOS do cartucho simulado)
-python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py
+python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py
 ```
 
 **v3** — rode a partir da pasta acima de `mega-genesis/`:

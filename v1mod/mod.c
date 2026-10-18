@@ -317,6 +317,13 @@ static int listAdd(int l, const Rec *r)
     return 1;
 }
 
+static void listClear(int l)
+{
+    scratchLoad();
+    SCR_HDR->count[l] = 0;
+    scratchCommit();
+}
+
 static void listRemove(int l, int idx)
 {
     ListEnt *list;
@@ -629,6 +636,8 @@ DSEC static void diagChip(void)
 }
 #endif
 
+static int isRom(const char *name);
+
 /* load (and optionally start) gCur; returns only when not started */
 static u8 launch(int start)
 {
@@ -652,7 +661,8 @@ static u8 launch(int start)
         osError(S_prog_error, e);
         return e;
     }
-    listAdd(0, &gCur);
+    if (isRom(gCur.name))               /* a .rar/.txt loaded by mistake stays out of the recents */
+        listAdd(0, &gCur);
 #ifdef DIAG
     diagEvent(EV_LIST, 0, 0);
     gRec = 0;
@@ -726,12 +736,18 @@ static void listMenu(int l)
             shortName(gItemBuf[i], list[i].name, 34);
             gItems[i] = gItemBuf[i];
         }
+        if (!l)
+            gItems[n] = S_clear_recent;     /* last item of the recents: empty the list */
         if (sel >= n)
             sel = n - 1;
-        r = menu(gItems, n, sel);
+        r = menu(gItems, n + !l, sel);
         gOverlay = 0;
         if (r & 0x40)
             return;
+        if (!l && r == n) {
+            listClear(0);
+            continue;                       /* now shows "Nenhum jogo recente" */
+        }
         sel = r;
         if (l) {
             static const char *const sub[] = {S_fv_play, S_fv_remove, S_back};
