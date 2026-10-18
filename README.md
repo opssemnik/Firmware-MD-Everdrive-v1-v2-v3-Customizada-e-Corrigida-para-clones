@@ -8,7 +8,7 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `c32e4f0e17e8544e244e78009b041a222b0a02ea295bb08c30a0f60466a42dee` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `542108d97a1de8dd2af104a0b9ab6e1309c75a887778984cf78c93e4b1a394c5` |
 | EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `a0a1bbfe0482bc0cdce64a1245325522ba55252515314ce272357b2a04ce0613` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
@@ -52,7 +52,7 @@ checksum, então o cartucho não fica "brickado".
 ### Controles no navegador de jogos
 | Botão | Ação |
 |---|---|
-| Cima / Baixo | move o cursor (parado ~0,4 s sobre uma ROM, a capa aparece ao lado) |
+| Cima / Baixo | move o cursor (parado ~0,3 s sobre uma ROM, a capa aparece no centro à direita) |
 | Esquerda / Direita | troca de página |
 | **START** | carrega e joga na hora |
 | **A** | numa pasta: entra; num jogo: abre o **menu do jogo** com a capa |

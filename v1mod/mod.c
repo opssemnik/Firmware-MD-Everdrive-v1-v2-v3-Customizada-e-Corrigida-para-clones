@@ -55,9 +55,9 @@ static u8 gSector0[512] __attribute__((aligned(4)));   /* SD/OS routines access 
 static u8 gArtBuf[512] __attribute__((aligned(4)));
 static u32 gArtHash;
 static u8 gArtCache;                    /* 0 none, 1 = art of gArtHash is in VRAM, 2 = it has no art */
-static u8 gPrevTop;
+#define PREV_TOP 8                       /* cover box: rows 8..16 (middle of the list), cols 27..38 */
 
-#define PREVIEW_DELAY 24                /* frames resting on a ROM before its cover loads (~0.4 s) */
+#define PREVIEW_DELAY 19                /* frames resting on a ROM before its cover loads (~0.32 s) */
 
 extern void ramToolbox(void);           /* RAM trampoline (hooks.S) */
 extern const u8 ramStubStart[], ramStubEnd[];
@@ -599,9 +599,8 @@ static int preview(u16 idx)
     memcpy(&gCur, RECCACHE + slot * 0x110, sizeof(Rec));
     if (gCur.isdir || !isRom(gCur.name) || !loadArt(1) || !gArtOk || PAD)
         return 0;
-    gPrevTop = slot < 10 ? 12 : 2;      /* list rows are 2..22; keep the cursor row visible */
-    osFill(PLANE_A, 0, 26, gPrevTop, 13, 9);
-    osFillSeq(PLANE_A, PAL3 | 0x80, 27, gPrevTop, 12, 9);
+    osFill(PLANE_A, 0, 26, PREV_TOP, 13, 9);
+    osFillSeq(PLANE_A, PAL3 | 0x80, 27, PREV_TOP, 12, 9);
     return 1;
 }
 
@@ -617,7 +616,7 @@ void browserIdle(u32 idx)
         drawn = preview((u16)idx);
     }
     if (drawn)
-        osFill(PLANE_A, 0, 26, gPrevTop, 13, 9);
+        osFill(PLANE_A, 0, 26, PREV_TOP, 13, 9);
 }
 
 static void overlayFile(void)

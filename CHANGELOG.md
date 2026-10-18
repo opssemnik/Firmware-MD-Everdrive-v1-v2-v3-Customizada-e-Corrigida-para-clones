@@ -5,6 +5,10 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.3 — 2026-10-18
+- Capa da lista agora fica em posição fixa, no centro da lateral direita.
+- Espera para a capa aparecer reduzida em 20% (24 → 19 quadros, ~0,32 s em NTSC).
+
 ### 1.2 — 2026-10-18
 - **Capa na lista de jogos:** ao parar ~0,4 s sobre uma ROM em "Selecionar jogo", a capa aparece
   ao lado da lista. Rolar rápido não carrega nada; qualquer botão some com a capa e cancela a leitura.
