@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `542108d97a1de8dd2af104a0b9ab6e1309c75a887778984cf78c93e4b1a394c5` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `c8ef5dde5a50a8b667b08478d5fd0986959fe0a5df528b467d26bcbacc0ef5b9` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `28640417df50783e50b428f96e3e0282acac49206c3fdd4c0419304a981a091a` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `1d1b4bbd3675e456e5ff06ec52af620926b27b32f093f80e040e5c32fd38cc1f` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -59,9 +59,10 @@ checksum, então o cartucho não fica "brickado".
 | B | volta |
 
 Menu do jogo: **Carregar e jogar**, **Só carregar**, **Adicionar aos favoritos**, **Info da ROM**, **Voltar**.
+**ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema.
+Opções · Cheats · Ferramentas · Tema. A versão aparece no rodapé (**PT-BR 1.4 OS v38**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -81,7 +82,7 @@ O v3 carrega o OS do cartão SD. Renomeie `MDOS.ptbr.BIN` para **`MDOS.BIN`** e 
 |---|---|
 | Esquerda / Direita | troca de página |
 | START | repete o último jogo |
-| **A** | menu do arquivo + capa (Carregar e Jogar, Só Carregar, Favoritar Jogo, Info da ROM, Ver em Hex) |
+| **A** | menu do arquivo + capa (Carregar e Jogar, Só Carregar, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
 | B | volta |
 | **C** | menu principal (Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos) |
 
@@ -90,7 +91,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. O OS se identifica como **v40**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.2 OS v40**.
 
 ---
 

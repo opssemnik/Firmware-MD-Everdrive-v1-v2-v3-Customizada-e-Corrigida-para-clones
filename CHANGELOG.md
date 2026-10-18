@@ -5,6 +5,15 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.4 — 2026-10-18
+- **ESQ/DIR no menu do jogo** (botão A num jogo): vai para o jogo anterior/seguinte da pasta,
+  pulando pastas e arquivos que não são ROM; ao sair, o cursor da lista fica nesse jogo.
+- **Versão do mod junto da versão do OS**: "PT-BR 1.4 OS v38" no rodapé do menu principal e em
+  Ferramentas → dispositivo.
+- Jogos com nome longo cortado pelo OS (nome atravessando setor do diretório) agora contam como
+  ROM no jogo aleatório e na navegação.
+- Build de diagnóstico (`build_v1_ptbr.py --diag`): cronômetro de carregamento e dados da flash.
+
 ### 1.3 — 2026-10-18
 - Capa da lista agora fica em posição fixa, no centro da lateral direita.
 - Espera para a capa aparecer reduzida em 20% (24 → 19 quadros, ~0,32 s em NTSC).
@@ -42,6 +51,17 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.2 — 2026-10-18
+- **Correção: capa na lista não aparecia no cartucho.** A tela da v3 usa buffer duplo; a prévia
+  desenhava no buffer oculto. Agora ela chama o repaint.
+- **Banner centralizado de 16 tiles**, igual ao da v1; o topo do navegador virou uma barra de
+  2 linhas com "Pág. x de y" na segunda.
+- Tiles da capa movidos para 0x100+ (desenhados direto na tabela de nomes), liberando espaço
+  para o banner.
+- **ESQ/DIR no menu do arquivo**: jogo anterior/seguinte da pasta; a lista acompanha.
+- **Versão do mod em Info Sistema**: "PT-BR 1.2 OS v40".
+- Código novo ocupa também as áreas dos textos em inglês que deixaram de ser usados.
 
 ### 1.1 — 2026-10-18
 - **Capa na lista de jogos** (porte da v1): parado ~0,3 s sobre um jogo, a capa aparece no centro

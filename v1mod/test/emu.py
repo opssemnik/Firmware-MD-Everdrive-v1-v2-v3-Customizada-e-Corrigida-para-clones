@@ -35,6 +35,7 @@ class Machine:
         self.sd = bytearray(Path(sd_path).read_bytes())
         self.vram = bytearray(0x10000)
         self.cram = [0] * 64
+        self.vsram = [0] * 64
         self.regs = [0] * 32
         self.vaddr = 0
         self.vcode = 0
@@ -178,6 +179,8 @@ class Machine:
             struct.pack_into('>H', self.vram, self.vaddr & 0xFFFE, w)
         elif code == 3:
             self.cram[(self.vaddr >> 1) & 63] = w
+        elif code == 5:
+            self.vsram[(self.vaddr >> 1) & 63] = w
         self.vaddr = (self.vaddr + self.regs[15]) & 0xFFFF
 
     def vdp_w(self, mu, off, size, value, ud):
@@ -221,9 +224,10 @@ class Machine:
         px = img.load()
         planes = ([0xE000] if plane_b else []) + [0xC000]
         for base in planes:
+            vs = (self.vsram[1 if base == 0xE000 else 0] >> 3) & 63
             for cy in range(28):
                 for cx in range(40):
-                    ent = struct.unpack_from('>H', self.vram, base + (cy * 64 + cx) * 2)[0]
+                    ent = struct.unpack_from('>H', self.vram, base + (((cy + vs) & 63) * 64 + cx) * 2)[0]
                     tile, pal = ent & 0x7FF, (ent >> 13) & 3
                     hf, vf = ent & 0x800, ent & 0x1000
                     for r in range(8):

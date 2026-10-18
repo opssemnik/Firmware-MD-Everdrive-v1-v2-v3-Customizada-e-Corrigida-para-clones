@@ -36,6 +36,7 @@ class MachineV3(emu.Machine):
         self.sd = bytearray(Path(sd_path).read_bytes())
         self.vram = bytearray(0x10000)
         self.cram = [0] * 64
+        self.vsram = [0] * 64
         self.regs = [0] * 32
         self.vaddr = self.vcode = 0
         self.pending = None
@@ -112,12 +113,13 @@ class MachineV3(emu.Machine):
             for cx in range(40):
                 ch = ' '
                 for base in (0xE000, 0xC000):
-                    t = struct.unpack_from('>H', self.vram, base + (cy * 64 + cx) * 2)[0] & 0x7FF
+                    vs = (self.vsram[1 if base == 0xE000 else 0] >> 3) & 63
+                    t = struct.unpack_from('>H', self.vram, base + (((cy + vs) & 63) * 64 + cx) * 2)[0] & 0x7FF
                     if 0x20 < t < 0x7F:
                         ch = chr(t)
-                    elif t >= 0x94 and t < 0x100:
+                    elif t >= 0x98:
                         ch = '#'
-                    elif 0x80 <= t < 0x94:
+                    elif 0x80 <= t < 0x98:
                         ch = '*'
                 s += ch
             lines.append(s.rstrip())

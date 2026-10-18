@@ -128,6 +128,27 @@ ramFlashProbe:
     rts
 #endif
 
+/* osMenu key check (was "move.w $ffe30c,d0; andi.b #$d0,d0" at $ff5af4). While gMenuLR is set,
+ * LEFT/RIGHT end the menu returning $81/$82 (after the button is released). RAM-only code. */
+    .globl  ramMenuLR
+ramMenuLR:
+    move.w  (0xFFE30C).l, %d0
+    tst.b   gMenuLR
+    beq.s   1f
+    btst    #2, %d0
+    bne.s   2f
+    btst    #3, %d0
+    beq.s   1f
+    move.b  #0x82, %d4
+    bra.s   3f
+2:  move.b  #0x81, %d4
+3:  tst.w   (0xFFE30C).l
+    bne.s   3b
+    addq.l  #4, %sp
+    jmp     0xFF5B3A                /* osMenu exit: returns d4 */
+1:  andi.b  #0xD0, %d0
+    rts
+
     .globl  ramToolbox
 ramToolbox:                     /* toolbox; never return into a rewritten flash */
     jsr     0xFF7B68
@@ -153,6 +174,7 @@ aHook:
     move.l  %d3, -(%sp)         /* cursor index */
     jsr     fileMenuFromBrowser
     addq.l  #4, %sp
+    move.l  %d0, 12(%sp)        /* returned index becomes the browser cursor (saved d3) */
     movem.l (%sp)+, %d0-%d7/%a0-%a6
     addq.l  #4, %sp
     jmp     0xFF64B4            /* browser redraw loop (page cache was invalidated) */

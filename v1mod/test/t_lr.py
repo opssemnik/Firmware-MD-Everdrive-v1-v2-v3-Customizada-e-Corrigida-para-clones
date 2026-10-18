@@ -1,0 +1,13 @@
+from t_all_lib import *
+m = new()
+print([l for l in m.text().splitlines() if 'OS v' in l])
+m.press('down'); m.press('a', after=120); m.press('down'); m.press('a', after=120); m.press('down'); m.press('a', after=120)
+for _ in range(3): m.press('down', hold=3, after=8)        # cursor on 4th entry (Game Genie Program)
+m.press('a', after=200); print('menu on:', [l.strip() for l in m.text().splitlines() if l.strip()][1])
+m.press('right', after=200); print('RIGHT ->', [l.strip() for l in m.text().splitlines() if l.strip()][1]); m.screen('v1_fm_right.png')
+m.press('right', after=200); print('RIGHT (NOTAS.TXT skipped, end) ->', [l.strip() for l in m.text().splitlines() if l.strip()][1])
+m.press('left', after=200); m.press('left', after=200); print('LEFT x2 ->', [l.strip() for l in m.text().splitlines() if l.strip()][1])
+m.press('b', after=250); show(m, 'back in browser (cursor = Columns)')
+m = new(); [m.press('down') for _ in range(7)]; m.press('a', after=200); m.press('down'); m.press('a', after=200)
+print([l for l in m.text().splitlines() if 'OS v' in l])
+print('\n'.join(l for l in logs if l.startswith('!!')) or 'no emulator errors')

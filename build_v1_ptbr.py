@@ -21,6 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
+MOD_VERSION = '1.4'     # shown with the OS version (main menu, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -123,7 +124,7 @@ OS_REPOINT = {
     0xFF96BB: 'MegaKey software...',
     0xFF96F5: 'erro na seleção: ',
     0xFF9701: 'erro na gravação: ',
-    0xFF9725: 'PT-BR OS v',
+    0xFF9725: f'PT-BR {MOD_VERSION} OS v',
     0xFF973A: 'Reset total:',
     0xFF9746: 'Modo Genny3:',
     0xFF9753: 'Backup auto SRAM:',
@@ -143,7 +144,7 @@ OS_REPOINT = {
     0xFF9823: 'Salvar em novo arquivo',
     0xFF9834: 'Carregar do SD',
     0xFF9841: 'erro ao salvar: ',
-    0xFF984E: 'Versão do OS: ',
+    0xFF984E: f'PT-BR {MOD_VERSION} - OS v',
     0xFF985B: 'Versão firmware: ',
     0xFF986E: 'MegaKey: ',
     0xFF988A: 'Sistema arq.: ',
@@ -381,6 +382,7 @@ def main():
     patch(0xFF594A, jsr(0xFF7FB2), jsr(syms['ramMenuClear']))           # menu clear -> banner/overlay
     patch(0xFF5C7E, bytes.fromhex('4feffe002f02'), struct.pack('>HI', 0x4EF9, syms['ramSave']))
     patch(0xFF6640, bytes.fromhex('4a68000a670000d0'), jsr(syms['ramAHook']) + b'\x4e\x71')
+    patch(0xFF5AF4, bytes.fromhex('303900ffe30c0200ffd0'), jsr(syms['ramMenuLR']) + b'\x4e\x71' * 2)  # menu L/R
     patch(0xFF660E, bytes.fromhex('303900ffe30c6604424560f4'), jsr(syms['ramIdle']) + b'\x4e\x71' * 3)  # input wait
     disp = syms['ramAbout'] - (0xFF7C0A + 2)
     assert -0x8000 <= disp < 0x8000

@@ -45,6 +45,7 @@ static u8 gArtOk;
 static u8 gHdrOk;
 static u8 gDirLoaded;
 u8 gBrowseMode;                         /* read by the browser A-button hook */
+u8 gMenuLR;                             /* osMenu returns $81/$82 on LEFT/RIGHT (ramMenuLR) */
 static u32 gRand;
 static char gArtName[24];
 static char gArtPath[40];
@@ -670,8 +671,8 @@ static int isRom(const char *name)
     for (; *name; name++)
         if (*name == '.')
             dot = name + 1;
-    if (!dot)
-        return 0;
+    if (!dot)       /* the OS truncates long names that cross a directory sector: no extension left */
+        return 1;
     for (e = exts; *e; e += slen(e) + 1) {
         const char *a = dot, *b = e;
         while (*a && lower(*a) == *b)
@@ -967,13 +968,29 @@ static void romInfo(void)
     waitKey();
 }
 
-/* entered from the browser hook when A is pressed on a file; idx = cursor index */
-void fileMenuFromBrowser(u32 idx)
+/* next/previous ROM file of the loaded folder from idx (dir = -1/+1) into gCur; -1 when none */
+static int neighbourRom(int idx, int dir)
+{
+    int n = DIR_COUNT();
+    for (idx += dir; idx >= 0 && idx < n; idx += dir) {
+        DirEnt *e = DIR_ENT(idx);
+        if (!e->isdir && !osMakeRec(e, &gTmp) && isRom(gTmp.name)) {
+            memcpy(&gCur, &gTmp, sizeof(Rec));
+            return idx;
+        }
+    }
+    return -1;
+}
+
+/* entered from the browser hook when A is pressed on a file; idx = cursor index.
+ * LEFT/RIGHT switch to the previous/next game; the returned index becomes the browser cursor. */
+u32 fileMenuFromBrowser(u32 idx)
 {
     static const char *const items[] = {S_fm_load_start, S_fm_load_only, S_fm_add_fav, S_fm_rom_info, S_back};
     u8 sel = 0, r;
     char title[40];
 
+    idx &= 0xFFFF;
     memcpy(&gCur, RECCACHE + umod(idx, 21) * 0x110, sizeof(Rec));
     loadArt(0);
     shortName(title, gCur.name, 38);
@@ -981,9 +998,20 @@ void fileMenuFromBrowser(u32 idx)
         gTitle = title;
         gOverlay = overlayFile;
         MENU_CENTER_A = MENU_CENTER_B = 12;
+        gMenuLR = 1;
         r = menu(items, 5, sel);
+        gMenuLR = 0;
         MENU_CENTER_A = MENU_CENTER_B = 20;
         gOverlay = 0;
+        if (r == 0x81 || r == 0x82) {
+            int i = neighbourRom(idx, r == 0x81 ? -1 : 1);
+            if (i >= 0) {
+                idx = i;
+                loadArt(0);
+                shortName(title, gCur.name, 38);
+            }
+            continue;
+        }
         if (r & 0x40)
             break;
         sel = r;
@@ -1007,6 +1035,7 @@ void fileMenuFromBrowser(u32 idx)
     }
     osClear();
     PAGE_CACHE = 0xFFFF;
+    return idx;
 }
 
 /* ---------------------------------------------------------------- about / theme / main */
