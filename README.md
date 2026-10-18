@@ -9,7 +9,7 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
 | EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `542108d97a1de8dd2af104a0b9ab6e1309c75a887778984cf78c93e4b1a394c5` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `a0a1bbfe0482bc0cdce64a1245325522ba55252515314ce272357b2a04ce0613` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `c8ef5dde5a50a8b667b08478d5fd0986959fe0a5df528b467d26bcbacc0ef5b9` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -85,6 +85,11 @@ O v3 carrega o OS do cartão SD. Renomeie `MDOS.ptbr.BIN` para **`MDOS.BIN`** e 
 | B | volta |
 | **C** | menu principal (Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos) |
 
+**Capa na lista:** parado ~0,3 s sobre um jogo, a capa aparece no centro à direita da lista;
+qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega nada.
+
+![Capa na lista (v3)](v3/screens/lista_com_capa.png)
+
 O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. O OS se identifica como **v40**.
 
 ---
@@ -153,6 +158,8 @@ controle e cartão SD simulados, inclusive com a checagem de alinhamento de mem�
 pip install unicorn==2.1.4 pillow capstone
 # gera um cartão SD de teste (FAT32) via mtools/dosfstools no WSL: mkimg.py + mkimg.sh
 python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py
+# v3 (emu3.py, mesmo emulador com BIOS do cartucho simulado)
+python t3_preview.py ; python t3_flows.py
 ```
 
 **v3** — rode a partir da pasta acima de `mega-genesis/`:

@@ -43,6 +43,14 @@
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
 
+### 1.1 — 2026-10-18
+- **Capa na lista de jogos** (porte da v1): parado ~0,3 s sobre um jogo, a capa aparece no centro
+  à direita; qualquer botão redesenha a página e remove a capa. Rolar rápido não carrega nada.
+- **Banner "RETROGAMER POA" legível**: fonte 8x8 do menu (passo de 7 px para caber em 12 tiles),
+  dourado com sombra sobre a faixa vermelha.
+- Carregamento da capa e desenho dos tiles viraram sub-rotinas compartilhadas entre o menu do
+  arquivo e a prévia.
+
 ### 1.0 — 2026-10-17
 - Base: `MDOS.patched` (OS v3 usado em clones). Versão exibida como **v40**.
 - OS traduzido para PT-BR com acentos (ç ã õ á é í ó Ã).

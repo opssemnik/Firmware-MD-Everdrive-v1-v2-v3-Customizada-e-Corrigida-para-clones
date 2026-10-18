@@ -10,6 +10,9 @@
 !/OS-V38-PTBR.BIN
 !/MDOS.ptbr.BIN
 
+# screenshots da v3
+!/v3/
+
 # capas prontas (.ART) na mesma estrutura do cartão SD
 !/sd/
 

@@ -205,54 +205,37 @@ def build_font_and_banner_2bpp():
         ],
     ]
 
+    # Readable banner: the OS 8x8 font letters (rows 1-6) at a 7 px pitch so 14 characters fit
+    # in 12 tiles. 1 = crimson bar, 2 = gold letter, 0 = shadow (transparent, shows the backdrop).
     W, H = 96, 8
     canvas = [['1' for _ in range(W)] for _ in range(H)]
+    for y in (0, 7):
+        canvas[y][0] = canvas[y][W - 1] = '0'           # rounded ends
 
-    for x in range(W):
-        canvas[0][x] = '2'
-        canvas[7][x] = '2'
-    for x in (0, 1, W - 2, W - 1):
-        canvas[0][x] = '0'
-        canvas[7][x] = '0'
-    for y in (1, 6):
-        canvas[y][0] = '0'
-        canvas[y][1] = '2'
-        canvas[y][W - 2] = '2'
-        canvas[y][W - 1] = '0'
-    for y in range(2, 6):
-        canvas[y][0] = '2'
-        canvas[y][W - 1] = '2'
-
-    canvas[3][3] = '2'; canvas[4][3] = '2'; canvas[3][4] = '3'; canvas[4][4] = '2'
-    canvas[3][W - 4] = '2'; canvas[4][W - 4] = '2'; canvas[3][W - 5] = '3'; canvas[4][W - 5] = '2'
-
-    mini_font = {
-        'R': ["####.", "#...#", "####.", "#..#.", "#...#"],
-        'E': ["#####", "#....", "####.", "#....", "#####"],
-        'T': ["#####", "..#..", "..#..", "..#..", "..#.."],
-        'O': [".###.", "#...#", "#...#", "#...#", ".###."],
-        'G': [".####", "#....", "#..##", "#...#", ".###."],
-        'A': [".###.", "#...#", "#####", "#...#", "#...#"],
-        'M': ["#...#", "##.##", "#.#.#", "#...#", "#...#"],
-        'P': ["####.", "#...#", "####.", "#....", "#...."],
-        ' ': ["...", "...", "...", "...", "..."],
+    font = {    # Krikzz OS font, columns 1..7 of rows 1..6
+        'R': ["#####..", "##..##.", "##..##.", "#####..", "##.##..", "##..##."],
+        'E': ["######.", "##.....", "#####..", "##.....", "##.....", "######."],
+        'T': ["######.", "..##...", "..##...", "..##...", "..##...", "..##..."],
+        'O': [".####..", "##..##.", "##..##.", "##..##.", "##..##.", ".####.."],
+        'G': [".#####.", "##.....", "##.....", "##.###.", "##..##.", ".#####."],
+        'A': ["..##...", ".####..", "##..##.", "##..##.", "######.", "##..##."],
+        'M': ["##...##", "###.###", "#######", "##.#.##", "##...##", "##...##"],
+        'P': ["#####..", "##..##.", "##..##.", "#####..", "##.....", "##....."],
     }
+    width = lambda c: 3 if c == ' ' else (7 if c == 'M' else 6)
     text = "RETROGAMER POA"
-    glyphs = [mini_font[c] for c in text]
-    total_w = sum(len(g[0]) for g in glyphs) + (len(glyphs) - 1)
-    start_x = (W - total_w) // 2
-
-    cur_x = start_x
-    for g in glyphs:
-        gw = len(g[0])
-        for ry in range(5):
-            for rx in range(gw):
-                if g[ry][rx] == '#':
-                    if 1 + ry + 1 <= 6 and cur_x + rx + 1 < W - 2:
-                        if canvas[1 + ry + 1][cur_x + rx + 1] == '1':
-                            canvas[1 + ry + 1][cur_x + rx + 1] = '2'
-                    canvas[1 + ry][cur_x + rx] = '3'
-        cur_x += gw + 1
+    total_w = sum(width(c) + 1 for c in text) - 1
+    cur_x = (W - total_w) // 2
+    for c in text:
+        if c != ' ':
+            for ry, row in enumerate(font[c]):
+                for rx in range(width(c)):
+                    if row[rx] == '#':
+                        canvas[1 + ry][cur_x + rx] = '2'
+                        sy, sx = 2 + ry, cur_x + rx + 1
+                        if sy < H and canvas[sy][sx] == '1':
+                            canvas[sy][sx] = '0'
+        cur_x += width(c) + 1
 
     out = bytearray()
     for tile_rows in accent_glyphs:
@@ -262,6 +245,9 @@ def build_font_and_banner_2bpp():
         out.extend(pack_2bpp_tile(tile_rows))
     assert len(out) == 20 * 16
     return bytes(out)
+
+
+PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
 def build_custom_mdos():
@@ -904,29 +890,24 @@ def build_custom_mdos():
     ext.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
     ext.emit(0x4e75)                                # rts
 
-    # 9. romFileMenu_v2
-    ext.label('romFileMenu_v2')
-    ext.emit(0x48e7, 0x3c38)                        # movem.l d2-d5/a2-a4, -(a7)
-    ext.emit(0x286f, 0x0020)                        # movea.l $20(a7), a4 (fat_rec)
+    # 9a. loadArtVram(a4 = fat_rec): box art of the ROM -> palette 3 + tiles 0x94.. ; d0 = 0 when loaded
+    ext.label('loadArtVram')
     ext.bsr_w('calcRomArtPath')
     ext.emit(0x4a00)                                # tst.b d0
-    ext.bne_w('rfm_draw_menu')
-
+    ext.bne_w('lav_ret')
     ext.emit(0x42a7)                                # clr.l -(a7)
     ext.emit(0x4879, 0x00ff, 0xc580)                # pea.l $ffc580.l
     ext.emit(0x4eb9, 0x00ff, 0x2f48)                # jsr $ff2f48.l (fatOpenFileByName)
     ext.emit(0x508f)                                # addq.l #8, a7
     ext.emit(0x4a00)                                # tst.b d0
-    ext.bne_w('rfm_draw_menu')
-
+    ext.bne_w('lav_ret')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w
     ext.emit(0x4878, 0x0007)                        # pea.l $7.w (7 sectors)
     ext.emit(0x4879, 0x00ff, 0xc800)                # pea.l $ffc800.l
     ext.emit(0x4eb9, 0x00ff, 0x23c6)                # jsr $ff23c6.l (fatRead)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
     ext.emit(0x4a00)                                # tst.b d0
-    ext.bne_w('rfm_draw_menu')
-
+    ext.bne_w('lav_ret')
     ext.emit(0x45f9, 0x00ff, 0xc802)                # lea.l $ffc802.l, a2
     ext.emit(0x7601)                                # moveq #1, d3
     ext.label('rfm_pal_loop')
@@ -940,12 +921,115 @@ def build_custom_mdos():
     ext.emit(0x5243)                                # addq.w #1, d3
     ext.emit(0x0c43, 0x000e)                        # cmpi.w #14, d3
     ext.bls_w('rfm_pal_loop')
-
     ext.emit(0x4878, 0x0d80)                        # pea.l $d80.w
     ext.emit(0x4878, 0x1280)                        # pea.l $1280.w
     ext.emit(0x4879, 0x00ff, 0xc820)                # pea.l $ffc820.l
     ext.emit(0x4eb9, 0x00ff, 0x651a)                # jsr $ff651a.l (vdpVramWrite)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x7000)                                # moveq #0, d0
+    ext.label('lav_ret')
+    ext.emit(0x4e75)                                # rts
+
+    # 9b. drawArtTiles(d5 = x, d6 = y): prints the 12x9 art tiles 0x94..0xFF (palette 3)
+    ext.label('drawArtTiles')
+    ext.emit(0x4878, 0x0003)                        # pea.l $3.w (Pal 3)
+    ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
+    ext.emit(0x588f)                                # addq.l #4, a7
+    ext.emit(0x363c, 0x0094)                        # move.w #$94, d3
+    ext.label('dat_row')
+    ext.emit(0x2f06)                                # move.l d6, -(a7) (y)
+    ext.emit(0x2f05)                                # move.l d5, -(a7) (x)
+    ext.pea_label('str_empty')
+    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x740b)                                # moveq #11, d2
+    ext.label('dat_col')
+    ext.emit(0x2f03)                                # move.l d3, -(a7)
+    ext.emit(0x4eb9, 0x00ff, 0x3436)                # jsr $ff3436.l (gPrintChar)
+    ext.emit(0x588f)                                # addq.l #4, a7
+    ext.emit(0x5243)                                # addq.w #1, d3
+    ext.dbra(2, 'dat_col')
+    ext.emit(0x5246)                                # addq.w #1, d6
+    ext.emit(0x0c43, 0x0100)                        # cmpi.w #$100, d3
+    ext.bcs_w('dat_row')
+    ext.emit(0x4e75)                                # rts
+
+    # 9c. browseIdle: replaces the browser's "wait for a button" loop (jsr at 0xFF0E0C).
+    #     Returns with d0 = pad like ff620a. ff620a waits for the next vblank, so each loop
+    #     iteration is one frame: after PREVIEW_FRAMES idle frames on a file the cover is shown
+    #     at the centre right; the key that ends the wait first redraws the page (wiping it).
+    ext.label('browseIdle')
+    ext.emit(0x4eb9, 0x00ff, 0x620a)                # jsr $ff620a.l (read pad, waits 1 vblank)
+    ext.emit(0x4a40)                                # tst.w d0
+    ext.bne_w('bi_ret')
+    ext.emit(0x48e7, 0x3e38)                        # movem.l d2-d6/a2-a4, -(a7)
+    ext.emit(0x7600)                                # moveq #0, d3 (idle frames)
+    ext.emit(0x7c00)                                # moveq #0, d6 (cover drawn)
+    ext.label('bi_wait')
+    ext.emit(0x4247)                                # clr.w d7 (browser key repeat counter, as stock)
+    ext.emit(0x4eb9, 0x00ff, 0x620a)                # jsr $ff620a.l
+    ext.emit(0x4a40)                                # tst.w d0
+    ext.bne_w('bi_pressed')
+    ext.emit(0x5243)                                # addq.w #1, d3
+    ext.emit(0x0c43, PREVIEW_FRAMES)                # cmpi.w #PREVIEW_FRAMES, d3
+    ext.bne_w('bi_wait')                            # fires exactly once per idle period
+    ext.bsr_w('previewEntry')
+    ext.emit(0x7600 | (PREVIEW_FRAMES + 1))         # moveq #PREVIEW_FRAMES+1, d3 (past the trigger)
+    ext.bra_w('bi_wait')
+    ext.label('bi_pressed')
+    ext.emit(0x4a06)                                # tst.b d6
+    ext.beq_w('bi_out')
+    ext.emit(0x2f00)                                # move.l d0, -(a7) (keep the pad state)
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (full redraw)
+    ext.emit(0x2f04)                                # move.l d4, -(a7) (cursor)
+    ext.emit(0x4eb9, 0x00ff, 0x08e8)                # jsr $ff08e8.l (draw page: wipes the cover)
+    ext.emit(0x508f)                                # addq.l #8, a7
+    ext.emit(0x201f)                                # move.l (a7)+, d0
+    ext.label('bi_out')
+    ext.emit(0x4cdf, 0x1c7c)                        # movem.l (a7)+, d2-d6/a2-a4
+    ext.label('bi_ret')
+    ext.emit(0x4e75)                                # rts
+
+    # 9d. previewEntry(d4 = cursor index): cover of that file at x=27, y=9 (rows 9-17)
+    ext.label('previewEntry')
+    ext.emit(0x2279, 0x00ff, 0xc46c)                # movea.l $ffc46c.l, a1 (dir_hdr)
+    ext.emit(0x3011)                                # move.w (a1), d0 (entry count)
+    ext.emit(0xb044)                                # cmp.w d4, d0
+    ext.bls_w('pe_no')
+    ext.emit(0x7000)                                # moveq #0, d0
+    ext.emit(0x3004)                                # move.w d4, d0
+    ext.emit(0xe588)                                # lsl.l #2, d0
+    ext.emit(0x41f1, 0x0800)                        # lea.l (a1, d0.l), a0
+    ext.emit(0x2068, 0x3016)                        # movea.l $3016(a0), a0 (dir entry)
+    ext.emit(0x4a68, 0x000a)                        # tst.w $a(a0) (directory?)
+    ext.bne_w('pe_no')
+    ext.emit(0x4879, 0x00ff, 0xd600)                # pea.l $ffd600.l (fat_rec buffer)
+    ext.emit(0x2f08)                                # move.l a0, -(a7)
+    ext.emit(0x4eb9, 0x00ff, 0x2872)                # jsr $ff2872.l (fatGetRec)
+    ext.emit(0x508f)                                # addq.l #8, a7
+    ext.emit(0x4a00)                                # tst.b d0
+    ext.bne_w('pe_no')
+    ext.emit(0x49f9, 0x00ff, 0xd600)                # lea.l $ffd600.l, a4
+    ext.bsr_w('loadArtVram')
+    ext.emit(0x4a00)                                # tst.b d0
+    ext.bne_w('pe_no')
+    ext.emit(0x4eb9, 0x00ff, 0x620a)                # jsr $ff620a.l (pressed while loading?)
+    ext.emit(0x4a40)                                # tst.w d0
+    ext.bne_w('pe_no')
+    ext.emit(0x7c01)                                # moveq #1, d6 (cover drawn)
+    ext.emit(0x7a1b)                                # moveq #27, d5
+    ext.emit(0x7c09)                                # moveq #9, d6
+    ext.bsr_w('drawArtTiles')
+    ext.label('pe_no')
+    ext.emit(0x4e75)                                # rts
+
+    # 9. romFileMenu_v2
+    ext.label('romFileMenu_v2')
+    ext.emit(0x48e7, 0x3e38)                        # movem.l d2-d6/a2-a4, -(a7)
+    ext.emit(0x286f, 0x0024)                        # movea.l $24(a7), a4 (fat_rec)
+    ext.bsr_w('loadArtVram')
+    ext.emit(0x4a00)                                # tst.b d0
+    ext.bne_w('rfm_draw_menu')
 
     ext.emit(0x4878, 0x000a)                        # pea.l $a.w (h = 10)
     ext.emit(0x4878, 0x000c)                        # pea.l $c.w (w = 12)
@@ -962,24 +1046,9 @@ def build_custom_mdos():
     ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
     ext.emit(0x4fef, 0x0010)                        # lea.l $10(a7), a7
 
-    ext.emit(0x363c, 0x0094)                        # move.w #$94, d3
-    ext.emit(0x7808)                                # moveq #8, d4
-    ext.label('rfm_art_row')
-    ext.emit(0x2f04)                                # move.l d4, -(a7)
-    ext.emit(0x4878, 0x0019)                        # pea.l $19.w
-    ext.pea_label('str_empty')
-    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
-    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ext.emit(0x7a0b)                                # moveq #11, d5
-    ext.label('rfm_art_col')
-    ext.emit(0x2f03)                                # move.l d3, -(a7)
-    ext.emit(0x4eb9, 0x00ff, 0x3436)                # jsr $ff3436.l (gPrintChar)
-    ext.emit(0x588f)                                # addq.l #4, a7
-    ext.emit(0x5243)                                # addq.w #1, d3
-    ext.dbra(5, 'rfm_art_col')
-    ext.emit(0x5244)                                # addq.w #1, d4
-    ext.emit(0x0c44, 0x0010)                        # cmpi.w #16, d4
-    ext.bls_w('rfm_art_row')
+    ext.emit(0x7a19)                                # moveq #25, d5
+    ext.emit(0x7c08)                                # moveq #8, d6
+    ext.bsr_w('drawArtTiles')
 
     ext.emit(0x13fc, 0x0016, 0x00ff, 0x4895)        # move.b #$16, $ff4895.l
     ext.emit(0x13fc, 0x0016, 0x00ff, 0x361f)        # move.b #$16, $ff361f.l
@@ -1050,7 +1119,7 @@ def build_custom_mdos():
     ext.emit(0x7200)                                # moveq #0, d1
     ext.label('rfm_exit')
     ext.emit(0x2001)                                # move.l d1, d0
-    ext.emit(0x4cdf, 0x1c3c)                        # movem.l (a7)+, d2-d5/a2-a4
+    ext.emit(0x4cdf, 0x1c7c)                        # movem.l (a7)+, d2-d6/a2-a4
     ext.emit(0x4e75)                                # rts
 
     # 10. mainMenu_v2 (7-item Main Menu)
@@ -1637,6 +1706,10 @@ def build_custom_mdos():
 
     # B. Hook romFileMenu (0x0B8C -> jmp romFileMenu_v2.l)
     struct.pack_into('>HI', rom, 0x0B8C, 0x4EF9, all_labels['romFileMenu_v2'])
+
+    # B2. Hook the browser's wait-for-button loop (0x0E0C: jsr (a2); tst.w d0; beq.s 0e0a) -> browseIdle
+    assert rom[0x0E0A:0x0E12] == bytes.fromhex('42474e924a4067f8')
+    struct.pack_into('>HI', rom, 0x0E0C, 0x4EB9, all_labels['browseIdle'])
 
     # C. Hook browser C-button Main Menu call (0x0FF0) -> call_mainMenu_from_browser
     patch_long(0x0FF2, 0x00FF50BC, all_labels['call_mainMenu_from_browser'])
