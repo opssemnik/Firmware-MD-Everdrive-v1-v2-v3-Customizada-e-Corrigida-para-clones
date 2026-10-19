@@ -5,6 +5,9 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.7 — 2026-10-18
+- Sem mudanças de código; só a versão (mesma numeração da v3).
+
 ### 1.6 — 2026-10-18
 - Só ROMs (`.bin .md .gen .smd .sms .32x`) entram nos **Jogos recentes**: um `.rar` ou outro
   arquivo carregado por engano não aparece mais na lista.
@@ -60,6 +63,11 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.7 — 2026-10-18
+- **Correção: piscada ao trocar de jogo com ESQ/DIR no menu do arquivo.** A lista de jogos era
+  redesenhada (e aparecia por um instante) antes de abrir o menu do próximo jogo; agora a tela vai
+  direto de um menu para o outro, e a lista só é redesenhada ao sair do menu.
 
 ### 1.6 — 2026-10-18
 - **"Pág. x de y" embaixo**, logo acima da barra com o nome do arquivo, como na v1. A barra de cima

@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.6'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.7'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -1760,7 +1760,7 @@ def build_custom_mdos():
     blkB.emit(0x4e75)                               # rts
 
     # rfm_lr (inside romFileMenu_v2, d0 = $81/$82): previous/next file of the folder (skips
-    # folders), redraw the browser page on it, then reopen the file menu for it.
+    # folders), then reopen the file menu for it.
     blkB.label('rfm_lr')
     blkB.emit(0x7401)                               # moveq #1, d2
     blkB.emit(0x0c40, 0x0081)                       # cmpi.w #$81, d0
@@ -1788,12 +1788,7 @@ def build_custom_mdos():
     blkB.emit(0x2f08)                               # move.l a0, -(a7)
     blkB.emit(0x4eb9, 0x00ff, 0x2872)               # jsr $ff2872.l (fatGetRec -> a4)
     blkB.emit(0x508f)                               # addq.l #8, a7
-    blkB.emit(0x4878, 0x0001)                       # pea.l $1.w (full redraw)
-    blkB.emit(0x42a7)                               # clr.l -(a7)
-    blkB.emit(0x3f79, 0x00ff, 0xc5a2, 0x0002)       # move.w $ffc5a2.l, $2(a7) (cursor)
-    blkB.emit(0x4eb9, 0x00ff, 0x08e8)               # jsr $ff08e8.l (draw page)
-    blkB.emit(0x508f)                               # addq.l #8, a7
-    blkB.bra_w('rfm_restart')
+    blkB.bra_w('rfm_restart')                       # full-screen menu: the page is redrawn on exit
     blkB.label('rl_stay')
     blkB.bra_w('rfm_draw_menu')
 
