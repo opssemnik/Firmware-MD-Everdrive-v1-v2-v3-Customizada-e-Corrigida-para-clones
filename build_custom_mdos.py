@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.12'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.13'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -274,6 +274,16 @@ def build_custom_mdos():
     assert len(orig) == 131072
 
     rom = bytearray(orig)
+
+    # =========================================================================
+    # Overlay: screens that run on their own live in MDOS.BIN right after the 32 KB the BIOS
+    # loads (file offset 0x8000, 7 sectors). ovlEnter (block 2) reads them into the box-art
+    # buffer 0xFFC800 when one is opened and jumps to its entry in this table. Overlay code
+    # must not load box art/banner (same buffer) and calls resident code with jsr (far away).
+    # =========================================================================
+    ovl = Asm68k(0xFFC800)
+    for name in ('ovl_romInfo', 'ovl_about', 'ovl_options', 'ovl_recent', 'ovl_fav', 'ovl_cheats'):
+        ovl.bra_w(name)                             # entry offsets 0, 4, 8, 12, 16, 20
 
     # =========================================================================
     # Block 1: Helper routines at 0xFF0B92..0xFF0BFA (104 bytes of dead romFileMenu)
@@ -325,62 +335,68 @@ def build_custom_mdos():
     # =========================================================================
     blk2 = Asm68k(0xFF4F74)
     blk2.label('aboutScreen_ptbr')
-    blk2.emit(0x48e7, 0x3038)                       # movem.l d2-d3/a2-a4, -(a7)
-    blk2.emit(0x2879, 0x00ff, 0x0024)               # movea.l $ff0024.l, a4
-    blk2.emit(0x7400)                               # moveq #0, d2
-    blk2.emit(0x4eb9, 0x00ff, 0x3802)               # jsr $ff3802.l (gCleanPlan)
-    blk2.emit(0x45f9, 0x00ff, 0x3700)               # lea.l $ff3700.l, a2 (gAppendLine)
-    blk2.emit(0x47f9, 0x00ff, 0x30a0)               # lea.l $ff30a0.l, a3 (gSetPal)
-
-    # Loop over 18 lines in about_table (each entry = 6 bytes: word pal, long str_ptr)
-    blk2.lea_label(0, 'about_table')                 # lea about_table, a0
-    blk2.emit(0x7611)                                # moveq #17, d3 (18 lines)
-    blk2.label('ab_loop')
-    blk2.emit(0x2848)                                # movea.l a0, a4 (save table ptr in a4 temporarily)
-    blk2.emit(0x301c)                                # move.w (a4)+, d0 (pal)
-    blk2.emit(0x4840)                                # swap d0
-    blk2.emit(0x4240)                                # clr.w d0
-    blk2.emit(0x4840)                                # swap d0 (zero-extended long)
-    blk2.emit(0x2f00)                                # move.l d0, -(a7)
-    blk2.emit(0x4e93)                                # jsr (a3) (gSetPal)
-    blk2.emit(0x2f1c)                                # move.l (a4)+, -(a7) (str_ptr)
-    blk2.emit(0x4e92)                                # jsr (a2) (gAppendLine)
-    blk2.emit(0x508f)                                # addq.l #8, a7
-    blk2.emit(0x204c)                                # movea.l a4, a0
-    blk2.dbra(3, 'ab_loop')
-
-    blk2.emit(0x2879, 0x00ff, 0x0024)                # movea.l $ff0024.l, a4 (restore a4 = SRAM base for $ff5040!)
-    blk2.emit(0x47f9, 0x00ff, 0x33b6)                # lea.l $ff33b6.l, a3
-    blk2.emit(0x4e93)                                # jsr (a3)
-    blk2.emit(0x4ef9, 0x00ff, 0x5040)                # jmp $ff5040.l
+    blk2.emit(0x7004)                               # moveq #4, d0 (overlay entry: about)
+    # ovlEnter(d0 = overlay entry offset): load the overlay and jump into it; the caller's
+    # return address and arguments stay as they are. Returns 0 when MDOS.BIN can't be read.
+    blk2.label('ovlEnter')
+    blk2.emit(0x3f00)                               # move.w d0, -(a7)
+    blk2.emit(0x42a7)                               # clr.l -(a7)
+    blk2.pea_label('str_mdos_path')
+    blk2.emit(0x4eb9, 0x00ff, 0x2f48)               # jsr $ff2f48.l (fatOpenFileByName)
+    blk2.emit(0x508f)                               # addq.l #8, a7
+    blk2.emit(0x4a00)                               # tst.b d0
+    blk2.b_s(0x66, 'oe_fail')
+    blk2.emit(0x4878, 0x0040)                       # pea.l $40.w (skip the 32 KB already in RAM)
+    blk2.emit(0x4eb9, 0x00ff, 0x21d8)               # jsr $ff21d8.l (fatSkipSectors)
+    blk2.emit(0x588f)                               # addq.l #4, a7
+    blk2.emit(0x4a00)                               # tst.b d0
+    blk2.b_s(0x66, 'oe_fail')
+    blk2.emit(0x4878, 0x0001)                       # pea.l $1.w
+    blk2.emit(0x4878, 0x0007)                       # pea.l $7.w (7 sectors)
+    blk2.emit(0x4879, 0x00ff, 0xc800)               # pea.l $ffc800.l
+    blk2.emit(0x4eb9, 0x00ff, 0x23c6)               # jsr $ff23c6.l (fatRead)
+    blk2.emit(0x4fef, 0x000c)                       # lea.l $c(a7), a7
+    blk2.emit(0x4a00)                               # tst.b d0
+    blk2.b_s(0x66, 'oe_fail')
+    blk2.emit(0x301f)                               # move.w (a7)+, d0
+    blk2.emit(0x41f9, 0x00ff, 0xc800)               # lea.l $ffc800.l, a0
+    blk2.emit(0x4ef0, 0x0000)                       # jmp (a0, d0.w)
+    blk2.label('oe_fail')
+    blk2.emit(0x548f)                               # addq.l #2, a7
+    blk2.emit(0x7000)                               # moveq #0, d0
+    blk2.emit(0x4e75)                               # rts
     blk2_code_end = len(blk2.buf)
 
-    blk2.label('about_table')
-    ab_entries = [
-        (0, 'str_empty'),
-        (2, 'str_ab_title'),
-        (2, 'str_ab_dev'),
-        (0, 'str_empty'),
-        (2, 'str_ab_mod_hdr'),
-        (2, 'str_banner_tiles'),
-        (1, 'str_ab_mod_2'),
-        (0, 'str_empty'),
-        (2, 'str_ab_sup_hdr'),
-        (0, 'str_ab_sup_1'),
-        (0, 'str_ab_sup_2'),
-        (0, 'str_empty'),
-        (2, 'str_ab_ctl_hdr'),
-        (0, 'str_ab_ctl_1'),
-        (0, 'str_ab_ctl_2'),
-        (0, 'str_ab_ctl_3'),
-        (0, 'str_ab_ctl_4'),
-        (0, 'str_ab_ctl_5'),
-    ]
-    for pal, lbl_name in ab_entries:
-        blk2.emit(pal)
-        off = len(blk2.buf)
-        blk2.emit_l(0)
-        blk2.fixups.append((off, lbl_name, 'abs32'))
+    # about screen (overlay)
+    ovl.label('ovl_about')
+    ovl.emit(0x48e7, 0x3038)                       # movem.l d2-d3/a2-a4, -(a7)
+    ovl.emit(0x2879, 0x00ff, 0x0024)               # movea.l $ff0024.l, a4
+    ovl.emit(0x7400)                               # moveq #0, d2
+    ovl.emit(0x4eb9, 0x00ff, 0x3802)               # jsr $ff3802.l (gCleanPlan)
+    ovl.emit(0x45f9, 0x00ff, 0x3700)               # lea.l $ff3700.l, a2 (gAppendLine)
+    ovl.emit(0x47f9, 0x00ff, 0x30a0)               # lea.l $ff30a0.l, a3 (gSetPal)
+
+    # Loop over 18 lines in about_table (each entry = 6 bytes: word pal, long str_ptr)
+    ovl.lea_label(0, 'about_table')                 # lea about_table, a0
+    ovl.emit(0x7611)                                # moveq #17, d3 (18 lines)
+    ovl.label('ab_loop')
+    ovl.emit(0x2848)                                # movea.l a0, a4 (save table ptr in a4 temporarily)
+    ovl.emit(0x301c)                                # move.w (a4)+, d0 (pal)
+    ovl.emit(0x4840)                                # swap d0
+    ovl.emit(0x4240)                                # clr.w d0
+    ovl.emit(0x4840)                                # swap d0 (zero-extended long)
+    ovl.emit(0x2f00)                                # move.l d0, -(a7)
+    ovl.emit(0x4e93)                                # jsr (a3) (gSetPal)
+    ovl.emit(0x2f1c)                                # move.l (a4)+, -(a7) (str_ptr)
+    ovl.emit(0x4e92)                                # jsr (a2) (gAppendLine)
+    ovl.emit(0x508f)                                # addq.l #8, a7
+    ovl.emit(0x204c)                                # movea.l a4, a0
+    ovl.dbra(3, 'ab_loop')
+
+    ovl.emit(0x2879, 0x00ff, 0x0024)                # movea.l $ff0024.l, a4 (restore a4 = SRAM base for $ff5040!)
+    ovl.emit(0x47f9, 0x00ff, 0x33b6)                # lea.l $ff33b6.l, a3
+    ovl.emit(0x4e93)                                # jsr (a3)
+    ovl.emit(0x4ef9, 0x00ff, 0x5040)                # jmp $ff5040.l
 
     # =========================================================================
     # Block 3: playRandomGame & loadRomWithRecent at 0xFF50BC..0xFF5194 (216 bytes)
@@ -606,107 +622,16 @@ def build_custom_mdos():
     ext.emit(0x4cdf, 0x0404)                        # movem.l (a7)+, d2/a2
     ext.emit(0x4e75)                                # rts
 
-    # 6. recentlyPlayedMenu, favoritesMenu & slotListMenu
+    # 6. recentlyPlayedMenu / favoritesMenu (overlay) and the cheats game start (overlay)
     ext.label('recentlyPlayedMenu')
-    ext.lea_label(0, 'str_recent_title')
-    ext.lea_label(1, 'menu_no_recent')
-    ext.emit(0x203c, 0x00ff, 0xc500)                # move.l #$ffc500, d0
-    ext.bra_w('slotListMenu')
-
+    ext.emit(0x700c)                                # moveq #12, d0
+    ext.bra_w('ovlEnter')
     ext.label('favoritesMenu')
-    ext.lea_label(0, 'str_fav_title')
-    ext.lea_label(1, 'menu_no_fav')
-    ext.emit(0x203c, 0x00ff, 0xc528)                # move.l #$ffc528, d0
-
-    ext.label('slotListMenu')
-    # frame: 0 menu title, 4 item ptrs (10 + "Limpar recentes"), 52 fat_rec, 324 names 10 x 37,
-    # 694 "list empty" menu
-    ext.emit(0x48e7, 0x3838)                        # movem.l d2-d4/a2-a4, -(a7)
-    ext.emit(0x4fef, 0xfd46)                        # lea.l -698(a7), a7
-    ext.emit(0x2e88)                                # move.l a0, (a7) (title)
-    ext.emit(0x2f49, 694)                           # move.l a1, 694(a7)
-    ext.emit(0x2640)                                # movea.l d0, a3 (slot table)
-    ext.label('sl_restart')
-    ext.emit(0x45ef, 0x0004)                        # lea.l 4(a7), a2 (item ptrs)
-    ext.emit(0x49ef, 324)                           # lea.l 324(a7), a4 (names)
-    ext.emit(0x7600)                                # moveq #0, d3 (count)
-    ext.label('sl_read')
-    ext.emit(0x3003, 0xe548)                        # move.w d3, d0 ; lsl.w #2, d0
-    ext.emit(0x4878, 0x0110)                        # pea.l $110.w
-    ext.emit(0x486f, 56)                            # pea.l 56(a7) (fat_rec)
-    ext.emit(0x2f33, 0x0000)                        # move.l (a3, d0.w), -(a7)
-    ext.jsr_label('sramReadBytes')
-    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ext.emit(0x4a2f, 66)                            # tst.b 66(a7) (name)
-    ext.b_s(0x67, 'sl_done')
-    ext.emit(0x24cc)                                # move.l a4, (a2)+
-    ext.emit(0x41ef, 66)                            # lea.l 66(a7), a0
-    ext.emit(0x7020)                                # moveq #32, d0 (33 chars)
-    ext.label('sl_copy')
-    ext.emit(0x18d8)                                # move.b (a0)+, (a4)+
-    ext.dbeq(0, 'sl_copy')
-    ext.b_s(0x67, 'sl_next')
-    ext.emit(0x702e)                                # moveq #'.', d0 (long name: "...")
-    ext.emit(0x18c0, 0x18c0, 0x18c0)                # move.b d0, (a4)+ x3
-    ext.emit(0x4214)                                # clr.b (a4)
-    ext.label('sl_next')
-    ext.emit(0x286a, 0xfffc)                        # movea.l -4(a2), a4
-    ext.emit(0x49ec, 37)                            # lea.l 37(a4), a4
-    ext.emit(0x5243)                                # addq.w #1, d3
-    ext.emit(0x0c43, 10)                            # cmpi.w #10, d3
-    ext.b_s(0x65, 'sl_read')
-    ext.label('sl_done')
-    ext.emit(0x4292)                                # clr.l (a2)
-    ext.emit(0x7800, 0x3803)                        # moveq #0, d4 ; move.w d3, d4 (items)
-    ext.b_s(0x67, 'sl_empty')
-    ext.emit(0xb7fc, 0x00ff, 0xc500)                # cmpa.l #$ffc500, a3 (recent list?)
-    ext.b_s(0x66, 'sl_show')
-    ext.emit(0x24bc, 0, 0)                          # move.l #str_clear_recent, (a2)
-    ext.fixups.append((len(ext.buf) - 4, 'str_clear_recent', 'abs32'))
-    ext.emit(0x42aa, 0x0004)                        # clr.l 4(a2)
-    ext.emit(0x5244)                                # addq.w #1, d4
-    ext.label('sl_show')
-    ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x2f04)                                # move.l d4, -(a7)
-    ext.emit(0x486f, 0x0008)                        # pea.l 8(a7) (menu)
-    ext.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
-    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ext.emit(0x7200)                                # moveq #0, d1
-    ext.emit(0x0c00, 0x00ff)                        # cmpi.b #$ff, d0 (B)
-    ext.b_s(0x67, 'sl_exit')
-    ext.emit(0xb043)                                # cmp.w d3, d0 ("Limpar recentes"?)
-    ext.b_s(0x67, 'sl_clear')
-    ext.emit(0x0240, 0x000f, 0xe548)                # andi.w #$f, d0 ; lsl.w #2, d0
-    ext.emit(0x4878, 0x0110)                        # pea.l $110.w
-    ext.emit(0x486f, 56)                            # pea.l 56(a7) (fat_rec)
-    ext.emit(0x2f33, 0x0000)                        # move.l (a3, d0.w), -(a7)
-    ext.jsr_label('sramReadBytes')
-    ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x486f, 68)                            # pea.l 68(a7) (fat_rec)
-    ext.emit(0x4eb9, 0x00ff, 0x5f22)                # jsr $ff5f22.l (loadRom)
-    ext.emit(0x4fef, 0x0014)                        # lea.l $14(a7), a7
-    ext.emit(0x7200, 0x1200)                        # moveq #0, d1 ; move.b d0, d1
-    ext.b_s(0x66, 'sl_exit')
-    ext.emit(0x4eb9, 0x00ff, 0x567e)                # jsr $ff567e.l (startGame)
-    ext.emit(0x7200, 0x1200)                        # moveq #0, d1 ; move.b d0, d1
-    ext.b_s(0x60, 'sl_exit')
-    ext.label('sl_clear')
-    ext.emit(0x224b)                                # movea.l a3, a1
-    ext.emit(0x7209)                                # moveq #9, d1
-    ext.bsr_w('clr_slots')
-    ext.bra_w('sl_restart')                         # now empty: shows "Nenhum jogo recente"
-    ext.label('sl_empty')
-    ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x4878, 0x0001)                        # pea.l $1.w
-    ext.emit(0x2f2f, 694 + 8)                       # move.l 702(a7), -(a7)
-    ext.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
-    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ext.emit(0x7200)                                # moveq #0, d1
-    ext.label('sl_exit')
-    ext.emit(0x2001)                                # move.l d1, d0
-    ext.emit(0x4fef, 698)                           # lea.l 698(a7), a7
-    ext.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
-    ext.emit(0x4e75)                                # rts
+    ext.emit(0x7010)                                # moveq #16, d0
+    ext.bra_w('ovlEnter')
+    ext.label('cheatsPlay')
+    ext.emit(0x7014)                                # moveq #20, d0
+    ext.bra_w('ovlEnter')
 
     # 7. calcRomArtPath(fat_rec in a4)
     ext.label('calcRomArtPath')
@@ -800,7 +725,7 @@ def build_custom_mdos():
     ext.emit(0x2f7c, 0x0000, 0xc000, 0x0004)        # move.l #$c000, 4(a7) (the replaced instruction)
     ext.emit(0x4e75)                                # rts
 
-    # 8a. clsTitle(a4 = fat_rec): blank screen, banner, game name centred on row 3 (max 38 chars)
+    # 8a. clsTitle(a4 = fat_rec): blank screen, banner, game name centred on row 4 (max 38 chars)
     ext.label('clsTitle')
     ext.b_s(0x61, 'clsBanner')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w (Pal 1 gold)
@@ -812,7 +737,7 @@ def build_custom_mdos():
     ext.emit(0x12d8)                                # move.b (a0)+, (a1)+
     ext.dbeq(0, 'ct_copy')
     ext.emit(0x4211)                                # clr.b (a1)
-    ext.emit(0x4878, 0x0003)                        # pea.l $3.w (y=3)
+    ext.emit(0x4878, 0x0004)                        # pea.l $4.w (y=4, a blank row under the banner)
     ext.emit(0x4879, 0x00ff, 0xd720)                # pea.l $ffd720.l
     ext.emit(0x4eb9, 0x00ff, 0x35fe)                # jsr $ff35fe.l (gPrintCenter)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
@@ -827,72 +752,10 @@ def build_custom_mdos():
     ext.emit(0x588f)                                # addq.l #4, a7
     ext.emit(0x4e75)                                # rts
 
-    # 8. showRomInfo (Compact table-driven ROM Header Info screen)
+    # 8. showRomInfo(fat_rec): overlay
     ext.label('showRomInfo')
-    ext.emit(0x48e7, 0x3838)                        # movem.l d2-d4/a2-a4, -(a7)
-    ext.emit(0x286f, 0x001c)                        # movea.l $1c(a7), a4 (fat_rec)
-    ext.bsr_w('calcRomArtPath')
-    ext.bsr_w('clsBanner')
-    ext.emit(0x45f9, 0x00ff, 0x3556)                # lea.l $ff3556.l, a2 (gPrintAt)
-    ext.emit(0x47f9, 0x00ff, 0x30a0)                # lea.l $ff30a0.l, a3 (gSetPal)
-    ext.emit(0x4878, 0x0003)                        # pea.l $3.w (y=3)
-    ext.emit(0x4878, 0x0006)                        # pea.l $6.w (x=6)
-    ext.pea_label('str_ri_title')
-    ext.emit(0x4e92)                                # jsr (a2)
-    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-
-    # Loop over 8 entries in ri_table (each entry = 8 bytes: word y, word max_len, word hdr_off, word lbl_off)
-    ext.lea_label(4, 'ri_table')                    # lea ri_table, a4
-    ext.emit(0x7808)                                # moveq #8, d4 (9 rows)
-    ext.label('ri_loop')
-    ext.emit(0x341c)                                # move.w (a4)+, d2 (y)
-    ext.emit(0x361c)                                # move.w (a4)+, d3 (max_len)
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w (Pal 2)
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x2f02)                                # move.l d2, -(a7) (y)
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w (x=2)
-    ext.emit(0x2f1c)                                # move.l (a4)+, -(a7) (label_ptr)
-    ext.emit(0x4e92)                                # jsr (a2) (gPrintAt)
-    ext.emit(0x4297)                                # clr.l (a7) (Pal 0)
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x2f03)                                # move.l d3, -(a7) (max_len)
-    ext.emit(0x2f02)                                # move.l d2, -(a7) (y)
-    ext.emit(0x4878, 0x000d)                        # pea.l $d.w (x=13)
-    ext.emit(0x2f1c)                                # move.l (a4)+, -(a7) (hdr_addr)
-    ext.emit(0x4eb9, 0x00ff, 0x3526)                # jsr $ff3526.l (gPrintMaxLenAt)
-    ext.emit(0x4fef, 0x0020)                        # lea.l $20(a7), a7
-    ext.dbra(4, 'ri_loop')
-
-    # Row 19: Checksum
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x4878, 0x0013)                        # pea.l $13.w (y=19)
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w (x=2)
-    ext.pea_label('str_ri_chk')
-    ext.emit(0x4e92)                                # jsr (a2)
-    ext.emit(0x4297)                                # clr.l (a7)
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x4878, 0x0013)                        # pea.l $13.w (y=19)
-    ext.emit(0x4878, 0x000d)                        # pea.l $d.w (x=13)
-    ext.emit(0x4280)                                # clr.l d0
-    ext.emit(0x3039, 0x00ff, 0xc57c)                # move.w $ffc57c.l, d0
-    ext.emit(0x2f00)                                # move.l d0, -(a7)
-    ext.emit(0x4eb9, 0x00ff, 0x36b2)                # jsr $ff36b2.l (gPrintHex16At)
-    ext.emit(0x4fef, 0x001c)                        # lea.l $1c(a7), a7
-
-    # Row 25: Press any key
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x4878, 0x0019)                        # pea.l $19.w (y=25)
-    ext.pea_label('str_press_key')
-    ext.emit(0x4eb9, 0x00ff, 0x35fe)                # jsr $ff35fe.l (gPrintCenter)
-    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-
-    ext.emit(0x4eb9, 0x00ff, 0x33b6)                # jsr $ff33b6.l (gRepaint)
-    ext.emit(0x4eb9, 0x00ff, 0x6224)                # jsr $ff6224.l (edWaitKey)
     ext.emit(0x7000)                                # moveq #0, d0
-    ext.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
-    ext.emit(0x4e75)                                # rts
+    ext.bra_w('ovlEnter')
 
     # 9a. loadArtVram(a4 = fat_rec): box art of the ROM -> palette 3 + tiles 0x100.. ; d0 = 0 when loaded
     ext.label('loadArtVram')
@@ -1064,7 +927,7 @@ def build_custom_mdos():
     ext.label('rfm_draw_menu')
     ext.emit(0x13fc, 0x0001, 0x00ff, 0xc5a0)        # move.b #1, $ffc5a0.l (menuDraw returns L/R)
     ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x4878, 0x0005)                        # pea.l $5.w
+    ext.emit(0x4878, 0x0006)                        # pea.l $6.w
     ext.pea_label('menu_rom_5')
     ext.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
@@ -1098,7 +961,14 @@ def build_custom_mdos():
     ext.bra_w('rfm_pop_ret')
 
     ext.label('rfm_chk2')
-    ext.emit(0x0c40, 0x0002)                        # cmpi.w #2, d0
+    ext.emit(0x0c40, 0x0002)                        # cmpi.w #2, d0 (Jogar com Cheats)
+    ext.bne_w('rfm_chk2b')
+    ext.emit(0x2f0c)                                # move.l a4, -(a7)
+    ext.bsr_w('cheatsPlay')
+    ext.bra_w('rfm_pop_ret')
+
+    ext.label('rfm_chk2b')
+    ext.emit(0x0c40, 0x0003)                        # cmpi.w #3, d0 (Favoritar)
     ext.bne_w('rfm_chk3')
     ext.emit(0x2f0c)                                # move.l a4, -(a7)
     ext.bsr_w('addFavorite')
@@ -1111,7 +981,7 @@ def build_custom_mdos():
     ext.bra_w('rfm_ret0')
 
     ext.label('rfm_chk3')
-    ext.emit(0x0c40, 0x0003)                        # cmpi.w #3, d0
+    ext.emit(0x0c40, 0x0004)                        # cmpi.w #4, d0 (Info da ROM)
     ext.bne_w('rfm_chk4')
     ext.emit(0x2f0c)                                # move.l a4, -(a7)
     ext.bsr_w('showRomInfo')
@@ -1119,7 +989,7 @@ def build_custom_mdos():
     ext.bra_w('rfm_ret0')
 
     ext.label('rfm_chk4')
-    ext.emit(0x0c40, 0x0004)                        # cmpi.w #4, d0
+    ext.emit(0x0c40, 0x0005)                        # cmpi.w #5, d0 (Ver em Hex)
     ext.bne_w('rfm_ret0')
     ext.emit(0x2f0c)                                # move.l a4, -(a7)
     ext.emit(0x4eb9, 0x00ff, 0x5194)                # jsr $ff5194.l (hexView)
@@ -1245,25 +1115,6 @@ def build_custom_mdos():
     ext.emit(0x0200, 0x0a40, 0x0420, 0x00e6)        # 2: SEGA 16
     ext.emit(0x0202, 0x0a28, 0x0404, 0x0ee0)        # 3: OUTRUN
 
-    # ROM Info table: 8 entries of (word y, word max_len, long label_ptr, long hdr_addr)
-    ext.label('ri_table')
-    ri_entries = [
-        (5,  25, 'str_ri_us',  0x00FFC750),
-        (6,  23, 'str_empty',  0x00FFC769),
-        (8,  25, 'str_ri_jp',  0x00FFC720),
-        (9,  23, 'str_empty',  0x00FFC739),
-        (11, 16, 'str_ri_sys', 0x00FFC700),
-        (13, 16, 'str_ri_cop', 0x00FFC710),
-        (15, 14, 'str_ri_ser', 0x00FFC780),
-        (17, 16, 'str_ri_reg', 0x00FFC7F0),
-        (21, 26, 'str_ri_art', 0x00FFC580),        # box-art path (calcRomArtPath)
-    ]
-    for y, mlen, lbl_name, hdr_addr in ri_entries:
-        ext.emit(y, mlen)
-        lbl_off = len(ext.buf)
-        ext.emit_l(0, hdr_addr)
-        ext.fixups.append((lbl_off, lbl_name, 'abs32'))
-
     ext.label('tiles_2bpp_data')
     ext.emit_b(build_font_and_banner_2bpp())
 
@@ -1289,6 +1140,7 @@ def build_custom_mdos():
         'str_file_menu',
         'str_load_start',
         'str_load_only',
+        'str_cheats_play',
         'str_add_fav',
         'str_rom_info',
         'str_hex_view',
@@ -1330,6 +1182,9 @@ def build_custom_mdos():
     ext.label('str_banner_path')
     ext.emit_str(b'/EDMD/BANNER.ART')
 
+    ext.label('str_mdos_path')                      # ovlEnter: the overlay lives in the OS file
+    ext.emit_str(b'/EDMD/MDOS.BIN')
+
     ext.label('str_art_prefix')
     ext.emit_str(b'/EDMD/ART/')
 
@@ -1351,6 +1206,8 @@ def build_custom_mdos():
     ext.emit_str(b'Carregar e Jogar')
     ext.label('str_load_only')
     ext.emit_str(b'S\x86 Carregar')
+    ext.label('str_cheats_play')
+    ext.emit_str(b'Jogar com Cheats')
     ext.label('str_add_fav')
     ext.emit_str(b'Favoritar Jogo')
     ext.label('str_rom_info')
@@ -1437,26 +1294,6 @@ def build_custom_mdos():
     ext.label('str_mm_about')
     ext.emit_str(b'Cr\x84ditos')
 
-    # ROM Info Screen labels
-    ext.label('str_ri_title')
-    ext.emit_str(b'Info da ROM (Cabe\x80alho SEGA)')
-    ext.label('str_ri_us')
-    ext.emit_str(b'Nome US/EU:')
-    ext.label('str_ri_jp')
-    ext.emit_str(b'Nome JP:')
-    ext.label('str_ri_sys')
-    ext.emit_str(b'Console:')
-    ext.label('str_ri_cop')
-    ext.emit_str(b'Copyright:')
-    ext.label('str_ri_ser')
-    ext.emit_str(b'Serial:')
-    ext.label('str_ri_reg')
-    ext.emit_str(b'Regi\x81o:')
-    ext.label('str_ri_chk')
-    ext.emit_str(b'Checksum:')
-    ext.label('str_ri_art')
-    ext.emit_str(b'Arq. Capa:')
-
     # System Information
     ext.label('str_sys_info')
     ext.emit_str(b'Info do Sistema')
@@ -1476,34 +1313,6 @@ def build_custom_mdos():
     ext.emit_str(b'Data Build:')
     ext.label('str_asm_time')
     ext.emit_str(b'Hora Build:')
-
-    # About / Credits Screen
-    ext.label('str_ab_title')
-    ext.emit_str(b'EverDrive-MD V3 Flashcart')
-    ext.label('str_ab_dev')
-    ext.emit_str(b'Desenvolvido por I. Golubovskiy')
-    ext.label('str_ab_mod_hdr')
-    ext.emit_str(b'Mod PT-BR, Artwork & Favoritos:')
-    ext.label('str_ab_mod_2')
-    ext.emit_str(b'por Antonio e the Nobre')
-    ext.label('str_ab_sup_hdr')
-    ext.emit_str(b'Suporte:')
-    ext.label('str_ab_sup_1')
-    ext.emit_str(b'biokrik@gmail.com')
-    ext.label('str_ab_sup_2')
-    ext.emit_str(b'http://krikzz.com')
-    ext.label('str_ab_ctl_hdr')
-    ext.emit_str(b'Controles:')
-    ext.label('str_ab_ctl_1')
-    ext.emit_str(b'ESQ/DIR - mudar p\x83gina')
-    ext.label('str_ab_ctl_2')
-    ext.emit_str(b'START - repetir \x85ltimo jogo')
-    ext.label('str_ab_ctl_3')
-    ext.emit_str(b'A - menu do arquivo + Boxart')
-    ext.label('str_ab_ctl_4')
-    ext.emit_str(b'B - voltar')
-    ext.label('str_ab_ctl_5')
-    ext.emit_str(b'C - menu principal')
 
     # Status & Error Messages
     ext.label('str_fat_init')
@@ -1555,116 +1364,11 @@ def build_custom_mdos():
     # Block 5: optionsMenu_v2 in-place at 0xFF49B6..0xFF4B52 (412 bytes)
     # =========================================================================
     opt_asm = Asm68k(0xFF49B6)
-    opt_asm.emit(0x48e7, 0x3830)                    # movem.l d2-d4/a2-a3, -(a7)
-    opt_asm.emit(0x4244)                            # clr.w d4
-    opt_asm.emit(0x760f)                            # moveq #15, d3
+    opt_asm.label('optionsMenu_v2')
+    opt_asm.emit(0x7008)                            # moveq #8, d0 (overlay entry: options)
+    opt_asm.bra_w('ovlEnter')
 
-    opt_asm.label('opt_refresh')
-    opt_asm.emit(0x2479, 0x00ff, 0xc47a)            # movea.l $ffc47a.l, a2
-    opt_asm.emit(0x47f9, 0x00ff, 0x5926)            # lea.l $ff5926.l, a3 (edStrCopy: push dst first, src second!)
-
-    # Option 0: Game Region (push dst first!)
-    opt_asm.lea_label(0, 'str_opt_region')
-    opt_asm.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
-    opt_asm.emit(0x3012)                            # move.w (a2), d0
-    opt_asm.emit(0x0c40, 0x00c0)                    # cmpi.w #$c0, d0
-    opt_asm.bne_w('opt_reg_80')
-    opt_asm.emit(0x4879, 0x00ff, 0x6a52)            # pea.l $ff6a52.l ("EU PAL ")
-    opt_asm.bra_w('opt_reg_copy')
-    opt_asm.label('opt_reg_80')
-    opt_asm.emit(0x0c40, 0x0080)                    # cmpi.w #$80, d0
-    opt_asm.bne_w('opt_reg_00')
-    opt_asm.emit(0x4879, 0x00ff, 0x6a5a)            # pea.l $ff6a5a.l ("US NTSC")
-    opt_asm.bra_w('opt_reg_copy')
-    opt_asm.label('opt_reg_00')
-    opt_asm.emit(0x4a40)                            # tst.w d0
-    opt_asm.bne_w('opt_reg_world')
-    opt_asm.emit(0x4879, 0x00ff, 0x6a62)            # pea.l $ff6a62.l ("JP NTSC")
-    opt_asm.bra_w('opt_reg_copy')
-    opt_asm.label('opt_reg_world')
-    opt_asm.emit(0x34bc, 0x0040)                    # move.w #$40, (a2)
-    opt_asm.pea_label('str_world_7')
-    opt_asm.label('opt_reg_copy')
-    opt_asm.emit(0x4e93)                            # jsr (a3) (edStrCopy)
-    opt_asm.emit(0x508f)                            # addq.l #8, a7
-
-    # Options 1..3: MegaKey, SRAM Backup, Reset to Game (push dst first!)
-    opt_asm.emit(0x7401)                            # moveq #1, d2
-    opt_asm.label('opt_bool_loop')
-    opt_asm.lea_label(0, 'menu_options_5')
-    opt_asm.emit(0x2002)                            # move.l d2, d0
-    opt_asm.emit(0xe540)                            # lsl.w #2, d0
-    opt_asm.emit(0x2070, 0x0004)                    # movea.l $4(a0, d0.w), a0
-    opt_asm.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
-    opt_asm.emit(0x2002)                            # move.l d2, d0
-    opt_asm.emit(0xd040)                            # add.w d0, d0
-    opt_asm.emit(0x4a32, 0x0001)                    # tst.b $1(a2, d0.w)
-    opt_asm.bne_w('opt_bool_on')
-    opt_asm.pea_label('str_off_7')                  # (src)
-    opt_asm.bra_w('opt_bool_copy')
-    opt_asm.label('opt_bool_on')
-    opt_asm.pea_label('str_on_7')                   # (src)
-    opt_asm.label('opt_bool_copy')
-    opt_asm.emit(0x4e93)                            # jsr (a3) (edStrCopy)
-    opt_asm.emit(0x508f)                            # addq.l #8, a7
-    opt_asm.emit(0x5242)                            # addq.w #1, d2
-    opt_asm.emit(0x0c42, 0x0003)                    # cmpi.w #3, d2
-    opt_asm.bls_w('opt_bool_loop')
-
-    # Option 4: Visual Theme (push dst first, src second!)
-    opt_asm.lea_label(0, 'str_opt_theme')
-    opt_asm.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
-    opt_asm.emit(0x302a, 0x000c)                    # move.w $c(a2), d0
-    opt_asm.emit(0x0240, 0x0003)                    # andi.w #3, d0
-    opt_asm.emit(0xe540)                            # lsl.w #2, d0
-    opt_asm.lea_label(0, 'theme_names_ptrs')
-    opt_asm.emit(0x2f30, 0x0000)                    # move.l (a0, d0.w), -(a7) (src)
-    opt_asm.emit(0x4e93)                            # jsr (a3) (edStrCopy)
-    opt_asm.emit(0x508f)                            # addq.l #8, a7
-
-    opt_asm.emit(0x3f04)                            # move.w d4, -(a7)
-    opt_asm.emit(0x4267)                            # clr.w -(a7)
-    opt_asm.emit(0x4878, 0x0005)                    # pea.l $5.w
-    opt_asm.pea_label('menu_options_5')
-    opt_asm.emit(0x4eb9, 0x00ff, 0x4834)            # jsr $ff4834.l (menuDraw)
-    opt_asm.emit(0x3800)                            # move.w d0, d4
-    opt_asm.emit(0x4fef, 0x000c)                    # lea.l $c(a7), a7
-    opt_asm.emit(0x0c40, 0xffff)                    # cmpi.w #$ffff, d0
-    opt_asm.beq_w('opt_exit')
-
-    opt_asm.emit(0x4a40)                            # tst.w d0 (0 = Region)
-    opt_asm.bne_w('opt_tog_chk4')
-    opt_asm.emit(0x3012)                            # move.w (a2), d0
-    opt_asm.emit(0x0640, 0x0040)                    # addi.w #$40, d0
-    opt_asm.emit(0x0240, 0x00c0)                    # andi.w #$c0, d0
-    opt_asm.emit(0x3480)                            # move.w d0, (a2)
-    opt_asm.bra_w('opt_refresh')
-
-    opt_asm.label('opt_tog_chk4')
-    opt_asm.emit(0x0c40, 0x0004)                    # cmpi.w #4, d0 (4 = Theme)
-    opt_asm.bne_w('opt_tog_bool')
-    opt_asm.emit(0x302a, 0x000c)                    # move.w $c(a2), d0
-    opt_asm.emit(0x5240)                            # addq.w #1, d0
-    opt_asm.emit(0x0240, 0x0003)                    # andi.w #3, d0
-    opt_asm.emit(0x3540, 0x000c)                    # move.w d0, $c(a2)
-    opt_asm.jsr_label('applyTheme')
-    opt_asm.bra_w('opt_refresh')
-
-    opt_asm.label('opt_tog_bool')
-    opt_asm.emit(0x3004)                            # move.w d4, d0
-    opt_asm.emit(0xd040)                            # add.w d0, d0
-    opt_asm.emit(0x3232, 0x0000)                    # move.w (a2, d0.w), d1
-    opt_asm.emit(0x5241)                            # addq.w #1, d1
-    opt_asm.emit(0x0241, 0x0001)                    # andi.w #1, d1
-    opt_asm.emit(0x3581, 0x0000)                    # move.w d1, (a2, d0.w)
-    opt_asm.bra_w('opt_refresh')
-
-    opt_asm.label('opt_exit')
-    opt_asm.emit(0x4cdf, 0x0c1c)                    # movem.l (a7)+, d2-d4/a2-a3
-    opt_asm.emit(0x4e75)                            # rts
-
-
-    # ---- (free space after optionsMenu_v2)
+    # ---- (free space after the options stub)
     # addRecentIfRom(fat_rec): loading a .rar/.txt from the browser must not enter the recents
     opt_asm.label('addRecentIfRom')
     opt_asm.emit(0x206f, 0x0004)                        # movea.l $4(a7), a0
@@ -1814,6 +1518,410 @@ def build_custom_mdos():
     blkB.label('rf_r')
     blkB.emit(0x4e75)                               # rts
 
+    # ---- overlay code
+    # 8. showRomInfo (Compact table-driven ROM Header Info screen)
+    ovl.label('ovl_romInfo')
+    ovl.emit(0x48e7, 0x3838)                        # movem.l d2-d4/a2-a4, -(a7)
+    ovl.emit(0x286f, 0x001c)                        # movea.l $1c(a7), a4 (fat_rec)
+    ovl.bsr_w('calcRomArtPath')
+    ovl.bsr_w('clsBanner')
+    ovl.emit(0x45f9, 0x00ff, 0x3556)                # lea.l $ff3556.l, a2 (gPrintAt)
+    ovl.emit(0x47f9, 0x00ff, 0x30a0)                # lea.l $ff30a0.l, a3 (gSetPal)
+    ovl.emit(0x4878, 0x0004)                        # pea.l $4.w (y=4)
+    ovl.emit(0x4878, 0x0006)                        # pea.l $6.w (x=6)
+    ovl.pea_label('str_ri_title')
+    ovl.emit(0x4e92)                                # jsr (a2)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+
+    # Loop over 8 entries in ri_table (each entry = 8 bytes: word y, word max_len, word hdr_off, word lbl_off)
+    ovl.lea_label(4, 'ri_table')                    # lea ri_table, a4
+    ovl.emit(0x7808)                                # moveq #8, d4 (9 rows)
+    ovl.label('ri_loop')
+    ovl.emit(0x341c)                                # move.w (a4)+, d2 (y)
+    ovl.emit(0x361c)                                # move.w (a4)+, d3 (max_len)
+    ovl.emit(0x4878, 0x0002)                        # pea.l $2.w (Pal 2)
+    ovl.emit(0x4e93)                                # jsr (a3)
+    ovl.emit(0x2f02)                                # move.l d2, -(a7) (y)
+    ovl.emit(0x4878, 0x0002)                        # pea.l $2.w (x=2)
+    ovl.emit(0x2f1c)                                # move.l (a4)+, -(a7) (label_ptr)
+    ovl.emit(0x4e92)                                # jsr (a2) (gPrintAt)
+    ovl.emit(0x4297)                                # clr.l (a7) (Pal 0)
+    ovl.emit(0x4e93)                                # jsr (a3)
+    ovl.emit(0x2f03)                                # move.l d3, -(a7) (max_len)
+    ovl.emit(0x2f02)                                # move.l d2, -(a7) (y)
+    ovl.emit(0x4878, 0x000d)                        # pea.l $d.w (x=13)
+    ovl.emit(0x2f1c)                                # move.l (a4)+, -(a7) (hdr_addr)
+    ovl.emit(0x4eb9, 0x00ff, 0x3526)                # jsr $ff3526.l (gPrintMaxLenAt)
+    ovl.emit(0x4fef, 0x0020)                        # lea.l $20(a7), a7
+    ovl.dbra(4, 'ri_loop')
+
+    # Row 19: Checksum
+    ovl.emit(0x4878, 0x0002)                        # pea.l $2.w
+    ovl.emit(0x4e93)                                # jsr (a3)
+    ovl.emit(0x4878, 0x0014)                        # pea.l $14.w (y=20)
+    ovl.emit(0x4878, 0x0002)                        # pea.l $2.w (x=2)
+    ovl.pea_label('str_ri_chk')
+    ovl.emit(0x4e92)                                # jsr (a2)
+    ovl.emit(0x4297)                                # clr.l (a7)
+    ovl.emit(0x4e93)                                # jsr (a3)
+    ovl.emit(0x4878, 0x0014)                        # pea.l $14.w (y=20)
+    ovl.emit(0x4878, 0x000d)                        # pea.l $d.w (x=13)
+    ovl.emit(0x4280)                                # clr.l d0
+    ovl.emit(0x3039, 0x00ff, 0xc57c)                # move.w $ffc57c.l, d0
+    ovl.emit(0x2f00)                                # move.l d0, -(a7)
+    ovl.emit(0x4eb9, 0x00ff, 0x36b2)                # jsr $ff36b2.l (gPrintHex16At)
+    ovl.emit(0x4fef, 0x001c)                        # lea.l $1c(a7), a7
+
+    # Row 25: Press any key
+    ovl.emit(0x4878, 0x0002)                        # pea.l $2.w
+    ovl.emit(0x4e93)                                # jsr (a3)
+    ovl.emit(0x4878, 0x001a)                        # pea.l $1a.w (y=26)
+    ovl.pea_label('str_press_key')
+    ovl.emit(0x4eb9, 0x00ff, 0x35fe)                # jsr $ff35fe.l (gPrintCenter)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+
+    ovl.emit(0x4eb9, 0x00ff, 0x33b6)                # jsr $ff33b6.l (gRepaint)
+    ovl.emit(0x4eb9, 0x00ff, 0x6224)                # jsr $ff6224.l (edWaitKey)
+    ovl.emit(0x7000)                                # moveq #0, d0
+    ovl.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
+    ovl.emit(0x4e75)                                # rts
+
+    # 6. recentlyPlayedMenu, favoritesMenu & slotListMenu
+    ovl.label('ovl_recent')
+    ovl.lea_label(0, 'str_recent_title')
+    ovl.lea_label(1, 'menu_no_recent')
+    ovl.emit(0x203c, 0x00ff, 0xc500)                # move.l #$ffc500, d0
+    ovl.bra_w('slotListMenu')
+
+    ovl.label('ovl_fav')
+    ovl.lea_label(0, 'str_fav_title')
+    ovl.lea_label(1, 'menu_no_fav')
+    ovl.emit(0x203c, 0x00ff, 0xc528)                # move.l #$ffc528, d0
+
+    ovl.label('slotListMenu')
+    # frame: 0 menu title, 4 item ptrs (10 + "Limpar recentes"), 52 fat_rec, 324 names 10 x 37,
+    # 694 "list empty" menu
+    ovl.emit(0x48e7, 0x3838)                        # movem.l d2-d4/a2-a4, -(a7)
+    ovl.emit(0x4fef, 0xfd46)                        # lea.l -698(a7), a7
+    ovl.emit(0x2e88)                                # move.l a0, (a7) (title)
+    ovl.emit(0x2f49, 694)                           # move.l a1, 694(a7)
+    ovl.emit(0x2640)                                # movea.l d0, a3 (slot table)
+    ovl.label('sl_restart')
+    ovl.emit(0x45ef, 0x0004)                        # lea.l 4(a7), a2 (item ptrs)
+    ovl.emit(0x49ef, 324)                           # lea.l 324(a7), a4 (names)
+    ovl.emit(0x7600)                                # moveq #0, d3 (count)
+    ovl.label('sl_read')
+    ovl.emit(0x3003, 0xe548)                        # move.w d3, d0 ; lsl.w #2, d0
+    ovl.emit(0x4878, 0x0110)                        # pea.l $110.w
+    ovl.emit(0x486f, 56)                            # pea.l 56(a7) (fat_rec)
+    ovl.emit(0x2f33, 0x0000)                        # move.l (a3, d0.w), -(a7)
+    ovl.jsr_label('sramReadBytes')
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ovl.emit(0x4a2f, 66)                            # tst.b 66(a7) (name)
+    ovl.b_s(0x67, 'sl_done')
+    ovl.emit(0x24cc)                                # move.l a4, (a2)+
+    ovl.emit(0x41ef, 66)                            # lea.l 66(a7), a0
+    ovl.emit(0x7020)                                # moveq #32, d0 (33 chars)
+    ovl.label('sl_copy')
+    ovl.emit(0x18d8)                                # move.b (a0)+, (a4)+
+    ovl.dbeq(0, 'sl_copy')
+    ovl.b_s(0x67, 'sl_next')
+    ovl.emit(0x702e)                                # moveq #'.', d0 (long name: "...")
+    ovl.emit(0x18c0, 0x18c0, 0x18c0)                # move.b d0, (a4)+ x3
+    ovl.emit(0x4214)                                # clr.b (a4)
+    ovl.label('sl_next')
+    ovl.emit(0x286a, 0xfffc)                        # movea.l -4(a2), a4
+    ovl.emit(0x49ec, 37)                            # lea.l 37(a4), a4
+    ovl.emit(0x5243)                                # addq.w #1, d3
+    ovl.emit(0x0c43, 10)                            # cmpi.w #10, d3
+    ovl.b_s(0x65, 'sl_read')
+    ovl.label('sl_done')
+    ovl.emit(0x4292)                                # clr.l (a2)
+    ovl.emit(0x7800, 0x3803)                        # moveq #0, d4 ; move.w d3, d4 (items)
+    ovl.b_s(0x67, 'sl_empty')
+    ovl.emit(0xb7fc, 0x00ff, 0xc500)                # cmpa.l #$ffc500, a3 (recent list?)
+    ovl.b_s(0x66, 'sl_show')
+    ovl.emit(0x24bc, 0, 0)                          # move.l #str_clear_recent, (a2)
+    ovl.fixups.append((len(ovl.buf) - 4, 'str_clear_recent', 'abs32'))
+    ovl.emit(0x42aa, 0x0004)                        # clr.l 4(a2)
+    ovl.emit(0x5244)                                # addq.w #1, d4
+    ovl.label('sl_show')
+    ovl.emit(0x42a7)                                # clr.l -(a7)
+    ovl.emit(0x2f04)                                # move.l d4, -(a7)
+    ovl.emit(0x486f, 0x0008)                        # pea.l 8(a7) (menu)
+    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ovl.emit(0x7200)                                # moveq #0, d1
+    ovl.emit(0x0c00, 0x00ff)                        # cmpi.b #$ff, d0 (B)
+    ovl.b_s(0x67, 'sl_exit')
+    ovl.emit(0xb043)                                # cmp.w d3, d0 ("Limpar recentes"?)
+    ovl.b_s(0x67, 'sl_clear')
+    ovl.emit(0x0240, 0x000f, 0xe548)                # andi.w #$f, d0 ; lsl.w #2, d0
+    ovl.emit(0x4878, 0x0110)                        # pea.l $110.w
+    ovl.emit(0x486f, 56)                            # pea.l 56(a7) (fat_rec)
+    ovl.emit(0x2f33, 0x0000)                        # move.l (a3, d0.w), -(a7)
+    ovl.jsr_label('sramReadBytes')
+    ovl.emit(0x42a7)                                # clr.l -(a7)
+    ovl.emit(0x486f, 68)                            # pea.l 68(a7) (fat_rec)
+    ovl.emit(0x4eb9, 0x00ff, 0x5f22)                # jsr $ff5f22.l (loadRom)
+    ovl.emit(0x4fef, 0x0014)                        # lea.l $14(a7), a7
+    ovl.emit(0x7200, 0x1200)                        # moveq #0, d1 ; move.b d0, d1
+    ovl.b_s(0x66, 'sl_exit')
+    ovl.emit(0x4eb9, 0x00ff, 0x567e)                # jsr $ff567e.l (startGame)
+    ovl.emit(0x7200, 0x1200)                        # moveq #0, d1 ; move.b d0, d1
+    ovl.b_s(0x60, 'sl_exit')
+    ovl.label('sl_clear')
+    ovl.emit(0x224b)                                # movea.l a3, a1
+    ovl.emit(0x7209)                                # moveq #9, d1
+    ovl.bsr_w('clr_slots')
+    ovl.bra_w('sl_restart')                         # now empty: shows "Nenhum jogo recente"
+    ovl.label('sl_empty')
+    ovl.emit(0x42a7)                                # clr.l -(a7)
+    ovl.emit(0x4878, 0x0001)                        # pea.l $1.w
+    ovl.emit(0x2f2f, 694 + 8)                       # move.l 702(a7), -(a7)
+    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ovl.emit(0x7200)                                # moveq #0, d1
+    ovl.label('sl_exit')
+    ovl.emit(0x2001)                                # move.l d1, d0
+    ovl.emit(0x4fef, 698)                           # lea.l 698(a7), a7
+    ovl.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
+    ovl.emit(0x4e75)                                # rts
+
+    ovl.label('ovl_options')
+    ovl.emit(0x48e7, 0x3830)                    # movem.l d2-d4/a2-a3, -(a7)
+    ovl.emit(0x4244)                            # clr.w d4
+    ovl.emit(0x760f)                            # moveq #15, d3
+
+    ovl.label('opt_refresh')
+    ovl.emit(0x2479, 0x00ff, 0xc47a)            # movea.l $ffc47a.l, a2
+    ovl.emit(0x47f9, 0x00ff, 0x5926)            # lea.l $ff5926.l, a3 (edStrCopy: push dst first, src second!)
+
+    # Option 0: Game Region (push dst first!)
+    ovl.lea_label(0, 'str_opt_region')
+    ovl.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
+    ovl.emit(0x3012)                            # move.w (a2), d0
+    ovl.emit(0x0c40, 0x00c0)                    # cmpi.w #$c0, d0
+    ovl.bne_w('opt_reg_80')
+    ovl.emit(0x4879, 0x00ff, 0x6a52)            # pea.l $ff6a52.l ("EU PAL ")
+    ovl.bra_w('opt_reg_copy')
+    ovl.label('opt_reg_80')
+    ovl.emit(0x0c40, 0x0080)                    # cmpi.w #$80, d0
+    ovl.bne_w('opt_reg_00')
+    ovl.emit(0x4879, 0x00ff, 0x6a5a)            # pea.l $ff6a5a.l ("US NTSC")
+    ovl.bra_w('opt_reg_copy')
+    ovl.label('opt_reg_00')
+    ovl.emit(0x4a40)                            # tst.w d0
+    ovl.bne_w('opt_reg_world')
+    ovl.emit(0x4879, 0x00ff, 0x6a62)            # pea.l $ff6a62.l ("JP NTSC")
+    ovl.bra_w('opt_reg_copy')
+    ovl.label('opt_reg_world')
+    ovl.emit(0x34bc, 0x0040)                    # move.w #$40, (a2)
+    ovl.pea_label('str_world_7')
+    ovl.label('opt_reg_copy')
+    ovl.emit(0x4e93)                            # jsr (a3) (edStrCopy)
+    ovl.emit(0x508f)                            # addq.l #8, a7
+
+    # Options 1..3: MegaKey, SRAM Backup, Reset to Game (push dst first!)
+    ovl.emit(0x7401)                            # moveq #1, d2
+    ovl.label('opt_bool_loop')
+    ovl.lea_label(0, 'menu_options_5')
+    ovl.emit(0x2002)                            # move.l d2, d0
+    ovl.emit(0xe540)                            # lsl.w #2, d0
+    ovl.emit(0x2070, 0x0004)                    # movea.l $4(a0, d0.w), a0
+    ovl.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
+    ovl.emit(0x2002)                            # move.l d2, d0
+    ovl.emit(0xd040)                            # add.w d0, d0
+    ovl.emit(0x4a32, 0x0001)                    # tst.b $1(a2, d0.w)
+    ovl.bne_w('opt_bool_on')
+    ovl.pea_label('str_off_7')                  # (src)
+    ovl.bra_w('opt_bool_copy')
+    ovl.label('opt_bool_on')
+    ovl.pea_label('str_on_7')                   # (src)
+    ovl.label('opt_bool_copy')
+    ovl.emit(0x4e93)                            # jsr (a3) (edStrCopy)
+    ovl.emit(0x508f)                            # addq.l #8, a7
+    ovl.emit(0x5242)                            # addq.w #1, d2
+    ovl.emit(0x0c42, 0x0003)                    # cmpi.w #3, d2
+    ovl.bls_w('opt_bool_loop')
+
+    # Option 4: Visual Theme (push dst first, src second!)
+    ovl.lea_label(0, 'str_opt_theme')
+    ovl.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
+    ovl.emit(0x302a, 0x000c)                    # move.w $c(a2), d0
+    ovl.emit(0x0240, 0x0003)                    # andi.w #3, d0
+    ovl.emit(0xe540)                            # lsl.w #2, d0
+    ovl.lea_label(0, 'theme_names_ptrs')
+    ovl.emit(0x2f30, 0x0000)                    # move.l (a0, d0.w), -(a7) (src)
+    ovl.emit(0x4e93)                            # jsr (a3) (edStrCopy)
+    ovl.emit(0x508f)                            # addq.l #8, a7
+
+    ovl.emit(0x3f04)                            # move.w d4, -(a7)
+    ovl.emit(0x4267)                            # clr.w -(a7)
+    ovl.emit(0x4878, 0x0005)                    # pea.l $5.w
+    ovl.pea_label('menu_options_5')
+    ovl.emit(0x4eb9, 0x00ff, 0x4834)            # jsr $ff4834.l (menuDraw)
+    ovl.emit(0x3800)                            # move.w d0, d4
+    ovl.emit(0x4fef, 0x000c)                    # lea.l $c(a7), a7
+    ovl.emit(0x0c40, 0xffff)                    # cmpi.w #$ffff, d0
+    ovl.beq_w('opt_exit')
+
+    ovl.emit(0x4a40)                            # tst.w d0 (0 = Region)
+    ovl.bne_w('opt_tog_chk4')
+    ovl.emit(0x3012)                            # move.w (a2), d0
+    ovl.emit(0x0640, 0x0040)                    # addi.w #$40, d0
+    ovl.emit(0x0240, 0x00c0)                    # andi.w #$c0, d0
+    ovl.emit(0x3480)                            # move.w d0, (a2)
+    ovl.bra_w('opt_refresh')
+
+    ovl.label('opt_tog_chk4')
+    ovl.emit(0x0c40, 0x0004)                    # cmpi.w #4, d0 (4 = Theme)
+    ovl.bne_w('opt_tog_bool')
+    ovl.emit(0x302a, 0x000c)                    # move.w $c(a2), d0
+    ovl.emit(0x5240)                            # addq.w #1, d0
+    ovl.emit(0x0240, 0x0003)                    # andi.w #3, d0
+    ovl.emit(0x3540, 0x000c)                    # move.w d0, $c(a2)
+    ovl.jsr_label('applyTheme')
+    ovl.bra_w('opt_refresh')
+
+    ovl.label('opt_tog_bool')
+    ovl.emit(0x3004)                            # move.w d4, d0
+    ovl.emit(0xd040)                            # add.w d0, d0
+    ovl.emit(0x3232, 0x0000)                    # move.w (a2, d0.w), d1
+    ovl.emit(0x5241)                            # addq.w #1, d1
+    ovl.emit(0x0241, 0x0001)                    # andi.w #1, d1
+    ovl.emit(0x3581, 0x0000)                    # move.w d1, (a2, d0.w)
+    ovl.bra_w('opt_refresh')
+
+    ovl.label('opt_exit')
+    ovl.emit(0x4cdf, 0x0c1c)                    # movem.l (a7)+, d2-d4/a2-a3
+    ovl.emit(0x4e75)                            # rts
+
+
+    # Jogar com Cheats(fat_rec): load the game, open the stock GG/RAW cheat editor (its "Aplicar"
+    # patches the loaded ROM), then start the game
+    ovl.label('ovl_cheats')
+    ovl.emit(0x4e56, 0xee10)                        # link.w a6, #-$11f0
+    ovl.emit(0x2f2e, 0x0008)                        # move.l 8(a6), -(a7) (fat_rec)
+    ovl.jsr_label('loadRomWithRecent')
+    ovl.emit(0x588f)                                # addq.l #4, a7
+    ovl.emit(0x4a40)                                # tst.w d0
+    ovl.b_s(0x66, 'oc_out')
+    ovl.emit(0x41ee, 0xee10)                        # lea.l -$11f0(a6), a0 (cheat tables, 112 bytes)
+    ovl.emit(0x721b)                                # moveq #27, d1
+    ovl.label('oc_clr')
+    ovl.emit(0x4298)                                # clr.l (a0)+
+    ovl.dbra(1, 'oc_clr')
+    ovl.jsr_label('clsBanner')                      # the editor opens on a clean screen
+    ovl.emit(0x486e, 0xee80)                        # pea.l -$1180(a6)
+    ovl.emit(0x4eb9, 0x00ff, 0x32c2)                # jsr $ff32c2.l (saveScreen)
+    ovl.emit(0x486e, 0xee10)                        # pea.l -$11f0(a6) (tables)
+    ovl.emit(0x486e, 0xee80)                        # pea.l -$1180(a6) (saved screen)
+    ovl.emit(0x4eb9, 0x00ff, 0x4362)                # jsr $ff4362.l (cheatsMenu)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ovl.emit(0x4eb9, 0x00ff, 0x567e)                # jsr $ff567e.l (startGame)
+    ovl.label('oc_out')
+    ovl.emit(0x4e5e)                                # unlk a6
+    ovl.emit(0x4e75)                                # rts
+
+    ovl_code_end = len(ovl.buf)
+
+    # ---- overlay data
+    ovl.label('about_table')
+    ab_entries = [
+        (0, 'str_empty'),
+        (2, 'str_ab_title'),
+        (2, 'str_ab_dev'),
+        (0, 'str_empty'),
+        (2, 'str_ab_mod_hdr'),
+        (2, 'str_banner_tiles'),
+        (1, 'str_ab_mod_2'),
+        (0, 'str_empty'),
+        (2, 'str_ab_sup_hdr'),
+        (0, 'str_ab_sup_1'),
+        (0, 'str_ab_sup_2'),
+        (0, 'str_empty'),
+        (2, 'str_ab_ctl_hdr'),
+        (0, 'str_ab_ctl_1'),
+        (0, 'str_ab_ctl_2'),
+        (0, 'str_ab_ctl_3'),
+        (0, 'str_ab_ctl_4'),
+        (0, 'str_ab_ctl_5'),
+    ]
+    for pal, lbl_name in ab_entries:
+        ovl.emit(pal)
+        off = len(ovl.buf)
+        ovl.emit_l(0)
+        ovl.fixups.append((off, lbl_name, 'abs32'))
+
+    # ROM Info table: 8 entries of (word y, word max_len, long label_ptr, long hdr_addr)
+    ovl.label('ri_table')
+    ri_entries = [
+        (6,  25, 'str_ri_us',  0x00FFC750),
+        (7,  23, 'str_empty',  0x00FFC769),
+        (9,  25, 'str_ri_jp',  0x00FFC720),
+        (10, 23, 'str_empty',  0x00FFC739),
+        (12, 16, 'str_ri_sys', 0x00FFC700),
+        (14, 16, 'str_ri_cop', 0x00FFC710),
+        (16, 14, 'str_ri_ser', 0x00FFC780),
+        (18, 16, 'str_ri_reg', 0x00FFC7F0),
+        (22, 26, 'str_ri_art', 0x00FFC580),        # box-art path (calcRomArtPath)
+    ]
+    for y, mlen, lbl_name, hdr_addr in ri_entries:
+        ovl.emit(y, mlen)
+        lbl_off = len(ovl.buf)
+        ovl.emit_l(0, hdr_addr)
+        ovl.fixups.append((lbl_off, lbl_name, 'abs32'))
+
+    # ROM Info Screen labels
+    ovl.label('str_ri_title')
+    ovl.emit_str(b'Info da ROM (Cabe\x80alho SEGA)')
+    ovl.label('str_ri_us')
+    ovl.emit_str(b'Nome US/EU:')
+    ovl.label('str_ri_jp')
+    ovl.emit_str(b'Nome JP:')
+    ovl.label('str_ri_sys')
+    ovl.emit_str(b'Console:')
+    ovl.label('str_ri_cop')
+    ovl.emit_str(b'Copyright:')
+    ovl.label('str_ri_ser')
+    ovl.emit_str(b'Serial:')
+    ovl.label('str_ri_reg')
+    ovl.emit_str(b'Regi\x81o:')
+    ovl.label('str_ri_chk')
+    ovl.emit_str(b'Checksum:')
+    ovl.label('str_ri_art')
+    ovl.emit_str(b'Arq. Capa:')
+
+    # About / Credits Screen
+    ovl.label('str_ab_title')
+    ovl.emit_str(b'EverDrive-MD V3 Flashcart')
+    ovl.label('str_ab_dev')
+    ovl.emit_str(b'Desenvolvido por I. Golubovskiy')
+    ovl.label('str_ab_mod_hdr')
+    ovl.emit_str(b'Mod PT-BR, Artwork & Favoritos:')
+    ovl.label('str_ab_mod_2')
+    ovl.emit_str(b'por Antonio e the Nobre')
+    ovl.label('str_ab_sup_hdr')
+    ovl.emit_str(b'Suporte:')
+    ovl.label('str_ab_sup_1')
+    ovl.emit_str(b'biokrik@gmail.com')
+    ovl.label('str_ab_sup_2')
+    ovl.emit_str(b'http://krikzz.com')
+    ovl.label('str_ab_ctl_hdr')
+    ovl.emit_str(b'Controles:')
+    ovl.label('str_ab_ctl_1')
+    ovl.emit_str(b'ESQ/DIR - mudar p\x83gina')
+    ovl.label('str_ab_ctl_2')
+    ovl.emit_str(b'START - repetir \x85ltimo jogo')
+    ovl.label('str_ab_ctl_3')
+    ovl.emit_str(b'A - menu do arquivo + Boxart')
+    ovl.label('str_ab_ctl_4')
+    ovl.emit_str(b'B - voltar')
+    ovl.label('str_ab_ctl_5')
+    ovl.emit_str(b'C - menu principal')
+
+
     # browser C button -> PT-BR main menu (moved here from ext for space)
     blkB.label('call_mainMenu_from_browser')
     blkB.bsr_w('mainMenu_v2')
@@ -1825,9 +1933,9 @@ def build_custom_mdos():
 
     # Combine all labels across all blocks and resolve fixups
     all_labels = {}
-    for b in (blk1, blk2, blk3, ext, opt_asm, blkA, blkB):
+    for b in (blk1, blk2, blk3, ext, opt_asm, blkA, blkB, ovl):
         all_labels.update(b.labels)
-    for b in (blk1, blk2, blk3, ext, opt_asm, blkA, blkB):
+    for b in (blk1, blk2, blk3, ext, opt_asm, blkA, blkB, ovl):
         b.resolve(all_labels)
 
     # Check bounds and write blocks into ROM
@@ -1855,6 +1963,10 @@ def build_custom_mdos():
     rom[0x6854:0x6854 + len(blkA.buf)] = blkA.buf
     assert rom[0x6B07:0x6B15] == b'Assembly Date:' and len(blkB.buf) <= 0x6BE6 - 0x6B08, len(blkB.buf)
     rom[0x6B08:0x6B08 + len(blkB.buf)] = blkB.buf
+
+    assert len(ovl.buf) <= 7 * 512, f"overlay too large: {len(ovl.buf)}"
+    assert rom[0x8000:0x8000 + len(ovl.buf)] == bytes(len(ovl.buf))
+    rom[0x8000:0x8000 + len(ovl.buf)] = ovl.buf
 
     assert 0x6E48 + len(ext.buf) <= 0x8000, f"Extension exceeds 32KB limit: 0x{0x6E48 + len(ext.buf):04X}"
     rom[0x6E48:0x6E48 + len(ext.buf)] = ext.buf
@@ -2018,6 +2130,7 @@ def build_custom_mdos():
         ('ext_code', bytes(ext.buf[:code_end_off]), 0xFF6E48),
         ('blkA', bytes(blkA.buf), 0xFF6854),
         ('blkB', bytes(blkB.buf), 0xFF6B08),
+        ('overlay', bytes(ovl.buf[:ovl_code_end]), 0xFFC800),
     ]:
         insns = list(md.disasm(buf, base))
         last_end = base
@@ -2042,6 +2155,7 @@ def build_custom_mdos():
     print(f"  blk3 (0xFF50BC):  {len(blk3.buf)} / 216 bytes")
     print(f"  opt  (0xFF49B6):  {len(opt_asm.buf)} / 414 bytes")
     print(f"  blkA (0xFF6854):  {len(blkA.buf)} / 124 bytes   blkB (0xFF6B08):  {len(blkB.buf)} / 222 bytes")
+    print(f"  ovl  (file 0x8000 -> 0xFFC800): {len(ovl.buf)} / 3584 bytes")
     print(f"  ext  (0xFF6E48):  0xFF6E48..0xFF{0x6E48 + used - 1:04X} ({used} bytes used, {free} bytes free)")
     print(f"  SHA-256: {sha}")
     print("  100% verified: 0 clone-check instructions, all m68k code blocks disassembled cleanly!")

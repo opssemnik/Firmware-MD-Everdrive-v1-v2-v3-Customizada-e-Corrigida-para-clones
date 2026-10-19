@@ -5,6 +5,10 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.13 — 2026-10-19
+- **Jogar com cheats** no menu do jogo (botão A): carrega o jogo, abre o menu de códigos Game Genie
+  e, ao sair dele, inicia o jogo com os códigos aplicados.
+
 ### 1.12 — 2026-10-18
 - **Espaço entre o banner e a lista de jogos**: uma linha em branco embaixo do banner. A lista
   ocupa as linhas 4-24, a página fica na 25 e a barra com o nome do arquivo nas linhas 26-27.
@@ -84,6 +88,15 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.13 — 2026-10-19
+- **Jogar com Cheats** no menu do arquivo (botão A): carrega o jogo, abre o editor de cheats
+  (GG/RAW; *Aplicar* grava os códigos no jogo carregado) e, ao sair dele, inicia o jogo.
+- Uma linha a mais entre o banner e o nome do jogo (menu do arquivo) e na tela Info da ROM.
+- **Overlay**: Info da ROM, Opções, Recentes/Favoritos, Créditos e Jogar com Cheats agora ficam no
+  próprio `MDOS.BIN`, depois dos 32 KB que a BIOS carrega, e são lidos do SD quando abertos. Isso
+  liberou ~1,4 KB no OS para recursos novos. O arquivo precisa estar em `/EDMD/MDOS.BIN`; sem ele,
+  essas telas não abrem (o resto funciona).
 
 ### 1.12 — 2026-10-18
 - **Espaço entre o banner e a lista de jogos**: uma linha em branco embaixo do banner. A lista

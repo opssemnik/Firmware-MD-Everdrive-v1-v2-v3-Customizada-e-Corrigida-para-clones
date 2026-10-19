@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `bb6d8ebfde5c0f81e29d38dd05bf8874bb33f6510911697b76fa280ecb5ea790` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `cbdc1ca05db00d8e27ca0fbd7ebc54a0b3c98f87d30e1c53659ebd609e0dabb9` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `4d43a657122a0428a75cbdcc57ed219156be83f807c86665461fcddd88bf080a` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `84721328cc5b230e1ee9458e6885d584e214ac6db075ebebc7574d2824fa9ee3` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -60,11 +60,13 @@ checksum, então o cartucho não fica "brickado".
 | **A** | numa pasta: entra; num jogo: abre o **menu do jogo** com a capa |
 | B | volta |
 
-Menu do jogo: **Carregar e jogar**, **Só carregar**, **Adicionar aos favoritos**, **Info da ROM**, **Voltar**.
+Menu do jogo: **Carregar e jogar**, **Só carregar**, **Jogar com cheats**, **Adicionar aos favoritos**,
+**Info da ROM**, **Voltar**. *Jogar com cheats* carrega o jogo, abre o menu de códigos Game Genie (digite ou
+carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.12**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.13**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -79,12 +81,16 @@ Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (
 O v3 carrega o OS do cartão SD. Renomeie `MDOS.ptbr.BIN` para **`MDOS.BIN`** e coloque em
 **`/EDMD/MDOS.BIN`** no cartão. Para voltar ao original, basta recolocar o `MDOS.BIN` original.
 
+O nome e a pasta precisam ser exatamente esses: a BIOS só carrega os primeiros 32 KB do arquivo, e as
+telas de Info da ROM, Opções, Recentes/Favoritos, Créditos e *Jogar com Cheats* são lidas do resto do
+próprio `MDOS.BIN` quando você as abre.
+
 ### Controles
 | Botão | Ação |
 |---|---|
 | Esquerda / Direita | troca de página |
 | START | repete o último jogo |
-| **A** | menu do arquivo em tela cheia, com o nome do jogo e a capa (Carregar e Jogar, Só Carregar, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
+| **A** | menu do arquivo em tela cheia, com o nome do jogo e a capa (Carregar e Jogar, Só Carregar, Jogar com Cheats, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
 | B | volta |
 | **C** | menu principal (Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos) |
 
@@ -93,7 +99,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.12**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.13**.
 
 ---
 
@@ -181,7 +187,8 @@ pip install unicorn==2.1.4 pillow capstone
 # gera um cartão SD de teste (FAT32) via mtools/dosfstools no WSL: mkimg.py + mkimg.sh
 python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py
 # v3 (emu3.py, mesmo emulador com BIOS do cartucho simulado)
-python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py ; python t3_flicker.py ; python t3_banner.py
+python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py ; python t3_flicker.py ; python t3_banner.py ; python t3_ovl.py ; python t3_nomdos.py
+# v3: rode sdput.sh (WSL) depois de compilar, para copiar o MDOS.BIN novo para as imagens do SD
 # banner: t_banner.py / t3_banner.py usam sd/sdb.img (o sd.img com /EDMD/BANNER.ART)
 ```
 

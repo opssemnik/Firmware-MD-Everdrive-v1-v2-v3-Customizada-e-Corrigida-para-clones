@@ -13,7 +13,7 @@ for img, tag in (('sd/sdb.img', 'img'), ('sd/sd.img', 'std')):
     m.press('down'); m.press('down'); m.run(40); show(m, f'{tag}: list + cover'); m.screen(f'v3_banner_{tag}_list.png')
     m.press('a', after=200); show(m, f'{tag}: file menu'); m.screen(f'v3_banner_{tag}_filemenu.png')
     m.press('right', after=200); m.screen(f'v3_banner_{tag}_filemenu2.png')
-    for _ in range(3): m.press('down')
+    for _ in range(4): m.press('down')
     m.press('a', after=300); show(m, f'{tag}: rom info'); m.screen(f'v3_banner_{tag}_rominfo.png')
     m.press('a', after=200); m.press('b', after=250); show(m, f'{tag}: back'); m.screen(f'v3_banner_{tag}_back.png')
     m.press('c', after=200); m.screen(f'v3_banner_{tag}_mainmenu.png')

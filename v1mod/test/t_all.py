@@ -24,7 +24,7 @@ step = sys.argv[1]
 m = new()
 m.press('down'); m.press('a', after=120); m.press('down'); m.press('a', after=120)
 m.press('down'); m.press('a', after=120); m.press('down'); m.press('down'); m.press('a', after=200)
-for _ in range(3): m.press('down')
+for _ in range(4): m.press('down')
 m.press('a', after=150)
 if step == 'info': show(m, 'rom info'); m.screen('shot_rominfo.png'); sys.exit()
 m.press('b', after=60); m.press('up'); m.press('a', after=200); m.press('a', after=60)

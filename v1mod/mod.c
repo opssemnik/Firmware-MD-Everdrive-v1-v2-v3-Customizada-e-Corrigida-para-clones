@@ -1067,7 +1067,8 @@ static int neighbourRom(int idx, int dir)
  * LEFT/RIGHT switch to the previous/next game; the returned index becomes the browser cursor. */
 u32 fileMenuFromBrowser(u32 idx)
 {
-    static const char *const items[] = {S_fm_load_start, S_fm_load_only, S_fm_add_fav, S_fm_rom_info, S_back};
+    static const char *const items[] = {S_fm_load_start, S_fm_load_only, S_fm_cheats, S_fm_add_fav, S_fm_rom_info,
+                                        S_back};
     u8 sel = 0, r;
     char title[40];
 
@@ -1080,7 +1081,7 @@ u32 fileMenuFromBrowser(u32 idx)
         gOverlay = overlayFile;
         MENU_CENTER_A = MENU_CENTER_B = 12;
         gMenuLR = 1;
-        r = menu(items, 5, sel);
+        r = menu(items, 6, sel);
         gMenuLR = 0;
         MENU_CENTER_A = MENU_CENTER_B = 20;
         gOverlay = 0;
@@ -1105,10 +1106,17 @@ u32 fileMenuFromBrowser(u32 idx)
                 info(S_loaded_ok);
             break;
         }
-        if (r == 2) {
+        if (r == 2) {                   /* load, the stock GG code menu ("aplicar" patches it), play */
+            if (!launch(0)) {
+                osCheats();
+                osStartGame(0);
+            }
+            break;
+        }
+        if (r == 3) {
             listAdd(1, &gCur);
             info(S_fav_saved);
-        } else if (r == 3) {
+        } else if (r == 4) {
             romInfo();
         } else {
             break;
