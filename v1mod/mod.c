@@ -46,6 +46,7 @@ static u8 gHdrOk;
 static u8 gDirLoaded;
 u8 gBrowseMode;                         /* read by the browser A-button hook */
 u8 gMenuLR;                             /* osMenu returns $81/$82 on LEFT/RIGHT (ramMenuLR) */
+u8 gCheatPlay;                          /* "Jogar com cheats": start the game right after applying */
 static u32 gRand;
 static char gArtName[24];
 static char gArtPath[40];
@@ -1053,7 +1054,7 @@ void browserIdle(u32 idx)
 
 static void overlayFile(void)
 {
-    center(gTitle, PAL2, 3);
+    center(gTitle, PAL2, 4);            /* a blank row under the banner */
     if (gArtOk)
         osFillSeq(PLANE_B, PAL3 | 0x80, 26, 8, 12, 9);
     else
@@ -1090,29 +1091,29 @@ static void hdrField(const char *label, u32 y, u32 off, int len, u32 x)
     osPrint(PLANE_A, i || !kanji ? b : S_ri_kanji, i ? PAL0 : PAL1, x, y);
 }
 
-static void romInfo(void)
+ROMB_CODE __attribute__((noinline)) static void romInfo(void)
 {
     char b[16];
     clearWithBanner();
-    center(S_ri_title, PAL2, 3);
+    center(S_ri_title, PAL2, 4);
     if (!gHdrOk || gSector0[0x100] != 'S' || gSector0[0x101] != 'E') {
-        center(S_ri_nohdr, PAL0, 8);
+        center(S_ri_nohdr, PAL0, 9);
     } else {
-        hdrField(S_ri_us, 5, 0x150, 24, 14);
-        hdrField(0, 6, 0x150 + 24, 24, 14);
-        hdrField(S_ri_jp, 8, 0x120, 24, 14);
-        hdrField(0, 9, 0x120 + 24, 24, 14);
-        hdrField(S_ri_sys, 11, 0x100, 16, 14);
-        hdrField(S_ri_cop, 13, 0x110, 16, 14);
-        hdrField(S_ri_ser, 15, 0x180, 14, 14);
-        hdrField(S_ri_reg, 17, 0x1F0, 16, 14);
-        osPrint(PLANE_A, S_ri_chk, PAL2, 2, 19);
+        hdrField(S_ri_us, 6, 0x150, 24, 14);
+        hdrField(0, 7, 0x150 + 24, 24, 14);
+        hdrField(S_ri_jp, 9, 0x120, 24, 14);
+        hdrField(0, 10, 0x120 + 24, 24, 14);
+        hdrField(S_ri_sys, 12, 0x100, 16, 14);
+        hdrField(S_ri_cop, 14, 0x110, 16, 14);
+        hdrField(S_ri_ser, 16, 0x180, 14, 14);
+        hdrField(S_ri_reg, 18, 0x1F0, 16, 14);
+        osPrint(PLANE_A, S_ri_chk, PAL2, 2, 20);
         hex(b, (u16)(gSector0[0x18E] << 8 | gSector0[0x18F]), 4);
-        osPrint(PLANE_A, b, PAL0, 14, 19);
+        osPrint(PLANE_A, b, PAL0, 14, 20);
     }
-    osPrintNum(S_ri_size, gCur.size >> 10, PAL2, 2, 21);
-    osPrint(PLANE_A, S_ri_art, PAL2, 2, 23);
-    osPrint(PLANE_A, gArtOk ? gArtName : S_no_art, gArtOk ? PAL0 : PAL1, 14, 23);
+    osPrintNum(S_ri_size, gCur.size >> 10, PAL2, 2, 22);
+    osPrint(PLANE_A, S_ri_art, PAL2, 2, 24);
+    osPrint(PLANE_A, gArtOk ? gArtName : S_no_art, gArtOk ? PAL0 : PAL1, 14, 24);
     center(S_press_key, PAL1, 26);
     waitKey();
 }
@@ -1176,7 +1177,9 @@ u32 fileMenuFromBrowser(u32 idx)
         }
         if (r == 2) {                   /* load, the stock GG code menu ("aplicar" patches it), play */
             if (!launch(0)) {
+                gCheatPlay = 1;         /* START (aplicar) in the code list starts the game (ramCheatApply) */
                 osCheats();
+                gCheatPlay = 0;
                 osStartGame(0);
             }
             break;

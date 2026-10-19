@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.14'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.15'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -402,6 +402,8 @@ def main():
                           (0xFF653A, '2ebc00000017', '2ebc00000019'), (0xFF6554, '48780017', '48780019')):
         patch(ram, bytes.fromhex(old), bytes.fromhex(new))
     patch(0xFF64A8, bytes.fromhex('13fc000100ffe306'), jsr(syms['ramBrowserBanner']) + b'\x4e\x71')
+    patch(0xFF3FEC, bytes.fromhex('6100fd2e588f'), jsr(syms['ramCheatApply']))       # GG codes: START
+    patch(0xFF5642, bytes.fromhex('303900a13002080000016' '7f4'), jsr(syms['ramEraseWait']) + bytes.fromhex('4e71') * 3)  # erase wait
     disp = syms['ramAbout'] - (0xFF7C0A + 2)
     assert -0x8000 <= disp < 0x8000
     patch(0xFF7C0A, bytes.fromhex('6100f736'), struct.pack('>Hh', 0x6100, disp))

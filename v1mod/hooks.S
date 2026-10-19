@@ -65,6 +65,99 @@ ramIdle:                        /* browser waiting for input (was a PAD polling 
     bra.s   1b
 2:  rts
 
+    .globl  ramCheatApply
+ramCheatApply:                  /* GG code list, START: apply (was bsr.w $ff3d1c; addq.l #4,sp at $ff3fec) */
+    move.l  4(%sp), -(%sp)
+    jsr     0xFF3D1C            /* stock: patch the codes into the loaded game */
+    addq.l  #4, %sp
+    movea.l (%sp)+, %a0
+    addq.l  #4, %sp             /* the displaced addq: drop the caller's argument */
+    CHECK   1f
+    tst.b   gCheatPlay          /* opened by "Jogar com cheats": play now */
+    beq.s   1f
+    clr.l   -(%sp)
+    jsr     0xFF4F32            /* osStartGame(0) */
+    addq.l  #4, %sp
+1:  jmp     (%a0)
+
+/* Flash erase wait (was a busy loop at $ff5642 in ff5592, which runs from RAM: the flash is unreadable
+ * meanwhile, so this must stay in RAM too). For the game loader's erase (return address $ff4d54) a
+ * progress bar fills the two rows under "apagando..." (where the copy bar goes next), timed at
+ * ~7.4 ms per KB (measured on the cart: 512 KB 3.8 s, 2 MB 15.2 s). VInt is off: frames are counted
+ * on the VDP VBlank flag. */
+    .globl  ramEraseWait
+ramEraseWait:
+    cmpi.l  #0xFF4D54, 16(%sp)  /* ff5592's return address (after its 12-byte movem + ours) */
+    beq.s   2f
+1:  move.w  (0xA13002).l, %d0
+    btst    #1, %d0
+    beq.s   1b
+    rts
+2:  movem.l %d2-%d7, -(%sp)
+    moveq   #0, %d4
+    move.w  0x1A+24(%sp), %d4   /* ff5592's size argument (KB) */
+    mulu.w  #7, %d4
+    lsr.l   #4, %d4             /* expected frames (60 Hz) */
+    bne.s   3f
+    moveq   #1, %d4
+3:  moveq   #0, %d2             /* frames so far */
+    moveq   #0, %d5             /* last VBlank flag */
+    moveq   #0, %d6             /* filled cells */
+    moveq   #0, %d3
+    move.b  (0xFFE306).l, %d3   /* status row under "apagando..." */
+    bsr.s   .Lbar
+.Lpoll:
+    move.w  (0xA13002).l, %d0
+    btst    #1, %d0
+    bne.s   .Lend
+    move.w  (0xC00004).l, %d0
+    andi.w  #8, %d0             /* VBlank */
+    cmp.w   %d5, %d0
+    beq.s   .Lpoll
+    move.w  %d0, %d5
+    beq.s   .Lpoll              /* count rising edges only */
+    addq.l  #1, %d2
+    move.l  %d2, %d0
+    cmp.l   %d4, %d0
+    bcs.s   4f
+    moveq   #37, %d0            /* longer than expected: wait on the last cell */
+    bra.s   5f
+4:  mulu.w  #38, %d0
+    divu.w  %d4, %d0
+5:  cmp.w   %d6, %d0
+    beq.s   .Lpoll
+    move.w  %d0, %d6
+    bsr.s   .Lbar
+    bra.s   .Lpoll
+.Lend:
+    moveq   #38, %d6
+    bsr.s   .Lbar
+    movem.l (%sp)+, %d2-%d7
+    rts
+/* the bar like the copy one: plane B rows d3, d3+1, cols 1-38; d6 cells of tile 3, the rest tile 2 */
+.Lbar:
+    move.w  %d3, %d1
+    moveq   #1, %d7
+6:  move.w  %d1, %d0
+    lsl.w   #7, %d0             /* row * 128 */
+    addi.w  #0x2002, %d0        /* plane B 0xE000 (bits 13-0) + column 1 */
+    swap    %d0
+    move.w  #3, %d0             /* address bits 15-14 */
+    ori.l   #0x40000000, %d0    /* VRAM write */
+    move.l  %d0, (0xC00004).l
+    move.w  %d6, %d0
+    bra.s   8f
+7:  move.w  #3, (0xC00000).l
+8:  dbra    %d0, 7b
+    moveq   #38, %d0
+    sub.w   %d6, %d0
+    bra.s   10f
+9:  move.w  #2, (0xC00000).l
+10: dbra    %d0, 9b
+    addq.w  #1, %d1
+    dbra    %d7, 6b
+    rts
+
     .globl  ramBrowserBanner
 ramBrowserBanner:               /* browser full redraw (was move.b #1,$ffe306 at $ff64a8) */
     move.b  #1, (0xFFE306).l

@@ -6,6 +6,11 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.15 — 2026-10-19
+- **Jogar com cheats**: o START na lista de códigos agora aplica os códigos e inicia o jogo (aparece "pronto"; aperte um botão). Antes ele só aplicava e voltava ao menu de cheats.
+- **Barra de progresso no "apagando..."** ao carregar um jogo: enche pelo tempo estimado (~7,4 ms por KB, medido no cartucho) e completa quando a flash termina.
+- Uma linha a mais entre o banner e o nome do jogo no menu do jogo e na tela Info da ROM.
+
 ### 1.14 — 2026-10-19
 - **Wallpaper**: `/EDMD/WALL.ART` (320×224, até 14 cores, gerado com `make_wallpaper.py`) atrás da
   lista de jogos e dos menus. Mesmo arquivo para v1 e v3.
@@ -95,6 +100,9 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.15 — 2026-10-19
+- Sem mudanças de código; só a versão (mesma numeração da v1).
 
 ### 1.14 — 2026-10-19
 - **Wallpaper**: `/EDMD/WALL.ART` (320×224, até 14 cores, gerado com `make_wallpaper.py`) atrás da
