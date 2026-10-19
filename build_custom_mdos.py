@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.8'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.9'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -313,13 +313,10 @@ def build_custom_mdos():
     blk1.label('draw_top_banner')
     blk1.emit(0x4878, 0x0002)                       # pea.l $2.w (Palette 2)
     blk1.emit(0x4e94)                               # jsr (a4) (gSetPal)
-    blk1.emit(0x4878, 0x0001)                       # pea.l $1.w (y = 1)
-    blk1.emit(0x4878, 0x000c)                       # pea.l $c.w (x = 12, centred)
-    blk1.pea_label('str_banner_tiles')              # "\x88..\x93"
-    blk1.emit(0x4e95)                               # jsr (a5) (gPrintAt)
+    blk1.bsr_w('printBanner')
     blk1.emit(0x4297)                               # clr.l (a7) (Palette 0)
     blk1.emit(0x4e94)                               # jsr (a4) (gSetPal)
-    blk1.emit(0x4fef, 0x0010)                       # lea.l $10(a7), a7
+    blk1.emit(0x588f)                               # addq.l #4, a7
     blk1.emit(0x2079, 0x00ff, 0xc46c)               # movea.l $ffc46c.l, a0 (original instruction)
     blk1.emit(0x4e75)                               # rts
 
@@ -536,6 +533,7 @@ def build_custom_mdos():
     ext.emit(0x4fef, 0x0018)                        # lea.l $18(a7), a7
     ext.bsr_w('applyTheme')
     ext.emit(0x42b9, 0x00ff, 0xc5a0)                # clr.l $ffc5a0.l (L/R flags + cursor)
+    ext.emit(0x4239, 0x00ff, 0xc5a4)                # clr.b $ffc5a4.l (image banner: not tried yet)
     ext.emit(0x4cdf, 0x0c3c)                        # movem.l (a7)+, d2-d5/a2-a3
     ext.emit(0x4e75)                                # rts
 
@@ -804,11 +802,8 @@ def build_custom_mdos():
     ext.emit(0x4eb9, 0x00ff, 0x3802)                # jsr $ff3802.l (gCleanPlan)
     ext.emit(0x4878, 0x0002)                        # pea.l $2.w (Pal 2)
     ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
-    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (y=1)
-    ext.emit(0x4878, 0x000c)                        # pea.l $c.w (x=12, centred)
-    ext.pea_label('str_banner_tiles')
-    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
-    ext.emit(0x4fef, 0x0010)                        # lea.l $10(a7), a7
+    ext.bsr_w('printBanner')
+    ext.emit(0x588f)                                # addq.l #4, a7
     ext.emit(0x4e75)                                # rts
 
     # 8. showRomInfo (Compact table-driven ROM Header Info screen)
@@ -827,7 +822,7 @@ def build_custom_mdos():
 
     # Loop over 8 entries in ri_table (each entry = 8 bytes: word y, word max_len, word hdr_off, word lbl_off)
     ext.lea_label(4, 'ri_table')                    # lea ri_table, a4
-    ext.emit(0x7807)                                # moveq #7, d4 (8 rows)
+    ext.emit(0x7808)                                # moveq #8, d4 (9 rows)
     ext.label('ri_loop')
     ext.emit(0x341c)                                # move.w (a4)+, d2 (y)
     ext.emit(0x361c)                                # move.w (a4)+, d3 (max_len)
@@ -864,21 +859,6 @@ def build_custom_mdos():
     ext.emit(0x4eb9, 0x00ff, 0x36b2)                # jsr $ff36b2.l (gPrintHex16At)
     ext.emit(0x4fef, 0x001c)                        # lea.l $1c(a7), a7
 
-    # Row 21: Artwork Path ($ffc580)
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x4878, 0x0015)                        # pea.l $15.w (y=21)
-    ext.emit(0x4878, 0x0002)                        # pea.l $2.w (x=2)
-    ext.pea_label('str_ri_art')
-    ext.emit(0x4e92)                                # jsr (a2)
-    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (Pal 1 Gold)
-    ext.emit(0x4e93)                                # jsr (a3)
-    ext.emit(0x4878, 0x0015)                        # pea.l $15.w (y=21)
-    ext.emit(0x4878, 0x000d)                        # pea.l $d.w (x=13)
-    ext.emit(0x4879, 0x00ff, 0xc580)                # pea.l $ffc580.l
-    ext.emit(0x4e92)                                # jsr (a2)
-    ext.emit(0x4fef, 0x0020)                        # lea.l $20(a7), a7
-
     # Row 25: Press any key
     ext.emit(0x4878, 0x0002)                        # pea.l $2.w
     ext.emit(0x4e93)                                # jsr (a3)
@@ -898,39 +878,75 @@ def build_custom_mdos():
     ext.bsr_w('calcRomArtPath')
     ext.emit(0x4a00)                                # tst.b d0
     ext.bne_w('lav_ret')
+    ext.lea_pc(1, 'art_params')
+    # loadTileFile(a1 = {path, palette, VRAM address}): a 7-sector .ART file (32-byte palette,
+    # colours 1..14 used, then 108 tiles) -> that palette and VRAM; d0 = 0 when loaded
+    ext.label('loadTileFile')
+    ext.emit(0x48e7, 0x1030)                        # movem.l d3/a2-a3, -(a7)
+    ext.emit(0x2649)                                # movea.l a1, a3
     ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x4879, 0x00ff, 0xc580)                # pea.l $ffc580.l
+    ext.emit(0x2f1b)                                # move.l (a3)+, -(a7) (path)
     ext.emit(0x4eb9, 0x00ff, 0x2f48)                # jsr $ff2f48.l (fatOpenFileByName)
     ext.emit(0x508f)                                # addq.l #8, a7
     ext.emit(0x4a00)                                # tst.b d0
-    ext.bne_w('lav_ret')
+    ext.b_s(0x66, 'ltf_ret')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w
     ext.emit(0x4878, 0x0007)                        # pea.l $7.w (7 sectors)
     ext.emit(0x4879, 0x00ff, 0xc800)                # pea.l $ffc800.l
     ext.emit(0x4eb9, 0x00ff, 0x23c6)                # jsr $ff23c6.l (fatRead)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
     ext.emit(0x4a00)                                # tst.b d0
-    ext.bne_w('lav_ret')
+    ext.b_s(0x66, 'ltf_ret')
     ext.emit(0x45f9, 0x00ff, 0xc802)                # lea.l $ffc802.l, a2
     ext.emit(0x7601)                                # moveq #1, d3
-    ext.label('rfm_pal_loop')
-    ext.emit(0x4280)                                # clr.l d0
-    ext.emit(0x301a)                                # move.w (a2)+, d0
-    ext.emit(0x2f00)                                # move.l d0, -(a7)
-    ext.emit(0x2f03)                                # move.l d3, -(a7)
-    ext.emit(0x4878, 0x0003)                        # pea.l $3.w
+    ext.label('ltf_pal')
+    ext.emit(0x7000, 0x301a)                        # moveq #0, d0 ; move.w (a2)+, d0
+    ext.emit(0x2f00, 0x2f03, 0x2f13)                # push colour, index, palette (a3)
     ext.emit(0x4eb9, 0x00ff, 0x65ae)                # jsr $ff65ae.l (vdpSetPal)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
     ext.emit(0x5243)                                # addq.w #1, d3
     ext.emit(0x0c43, 0x000e)                        # cmpi.w #14, d3
-    ext.bls_w('rfm_pal_loop')
-    ext.emit(0x4878, 0x0d80)                        # pea.l $d80.w
-    ext.emit(0x4878, 0x2000)                        # pea.l $2000.w (tiles 0x100.., char codes stay free)
+    ext.b_s(0x63, 'ltf_pal')
+    ext.emit(0x4878, 0x0d80)                        # pea.l $d80.w (108 tiles)
+    ext.emit(0x2f2b, 0x0004)                        # move.l 4(a3), -(a7) (VRAM address)
     ext.emit(0x4879, 0x00ff, 0xc820)                # pea.l $ffc820.l
     ext.emit(0x4eb9, 0x00ff, 0x651a)                # jsr $ff651a.l (vdpVramWrite)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
     ext.emit(0x7000)                                # moveq #0, d0
+    ext.label('ltf_ret')
+    ext.emit(0x4cdf, 0x0c08)                        # movem.l (a7)+, d3/a2-a3
     ext.label('lav_ret')
+    ext.emit(0x4e75)                                # rts
+
+    # 9a2. printBanner (palette 2 selected): RETROGAMER POA on rows 0-2 from /EDMD/BANNER.ART
+    # (36x3 tiles 0x170.., loaded once) or, without that file, the built-in banner on row 1.
+    ext.label('printBanner')
+    ext.emit(0x4a39, 0x00ff, 0xc5a4)                # tst.b $ffc5a4.l (0 = not tried yet)
+    ext.b_s(0x66, 'pb_tried')
+    ext.emit(0x5239, 0x00ff, 0xc5a4)                # addq.b #1, $ffc5a4.l (1 = no image)
+    ext.lea_pc(1, 'banner_params')
+    ext.bsr_w('loadTileFile')
+    ext.emit(0x4a00)                                # tst.b d0
+    ext.b_s(0x66, 'pb_tried')
+    ext.emit(0x5239, 0x00ff, 0xc5a4)                # addq.b #1, $ffc5a4.l (2 = image loaded)
+    ext.label('pb_tried')
+    ext.emit(0x0c39, 0x0002, 0x00ff, 0xc5a4)        # cmpi.b #2, $ffc5a4.l
+    ext.b_s(0x67, 'pb_image')
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (y=1)
+    ext.emit(0x4878, 0x000c)                        # pea.l $c.w (x=12, centred)
+    ext.pea_label('str_banner_tiles')
+    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x4e75)                                # rts
+    ext.label('pb_image')
+    ext.emit(0x48e7, 0x3e00)                        # movem.l d2-d6, -(a7)
+    ext.emit(0x363c, 0x4170)                        # move.w #$4170, d3 (palette 2, tile 0x170)
+    ext.emit(0x7823)                                # moveq #35, d4 (36 wide)
+    ext.emit(0x7402)                                # moveq #2, d2 (3 rows)
+    ext.emit(0x7a02)                                # moveq #2, d5 (x=2)
+    ext.emit(0x7c00)                                # moveq #0, d6 (y=0)
+    ext.bsr_w('drawTiles')
+    ext.emit(0x4cdf, 0x007c)                        # movem.l (a7)+, d2-d6
     ext.emit(0x4e75)                                # rts
 
     # 9b. drawArtTiles lives in blkA (old English file-menu strings, see below)
@@ -1175,25 +1191,11 @@ def build_custom_mdos():
     ext.label('mm_chk4')
     ext.emit(0x0c42, 0x0004)                        # cmpi.w #4, d2 (4 = Cheats)
     ext.bne_w('mm_chk5')
-    ext.emit(0x4241)                                # clr.w d1
+    ext.emit(0x41ee, 0xee10)                        # lea.l -$11f0(a6), a0 (cheat tables: 16 longs,
+    ext.emit(0x721b)                                # moveq #27, d1         16 words, 16 bytes)
     ext.label('mm_clr_cheats')
-    ext.emit(0x4280)                                # clr.l d0
-    ext.emit(0x3001)                                # move.w d1, d0
-    ext.emit(0x41f6, 0x0800)                        # lea.l (a6, d0.l), a0
-    ext.emit(0x4228, 0xee70)                        # clr.b -$1190(a0)
-    ext.emit(0x2001)                                # move.l d1, d0
-    ext.emit(0xe588)                                # lsl.l #2, d0
-    ext.emit(0x0280, 0x0003, 0xfffc)                # andi.l #$3fffc, d0
-    ext.emit(0x41f6, 0x0800)                        # lea.l (a6, d0.l), a0
-    ext.emit(0x42a8, 0xee10)                        # clr.l -$11f0(a0)
-    ext.emit(0x2001)                                # move.l d1, d0
-    ext.emit(0xd080)                                # add.l d0, d0
-    ext.emit(0x0280, 0x0001, 0xfffe)                # andi.l #$1fffe, d0
-    ext.emit(0x41f6, 0x0800)                        # lea.l (a6, d0.l), a0
-    ext.emit(0x4268, 0xee50)                        # clr.w -$11b0(a0)
-    ext.emit(0x5241)                                # addq.w #1, d1
-    ext.emit(0x0c41, 0x000f)                        # cmpi.w #$f, d1
-    ext.bls_w('mm_clr_cheats')
+    ext.emit(0x4298)                                # clr.l (a0)+
+    ext.dbra(1, 'mm_clr_cheats')
     ext.emit(0x486e, 0xee10)                        # pea.l -$11f0(a6)
     ext.emit(0x2f03)                                # move.l d3, -(a7)
     ext.emit(0x4eb9, 0x00ff, 0x4362)                # jsr $ff4362.l (cheatsMenu)
@@ -1221,13 +1223,6 @@ def build_custom_mdos():
     ext.emit(0x4e5e)                                # unlk a6
     ext.emit(0x4e75)                                # rts
 
-    ext.label('call_mainMenu_from_browser')
-    ext.bsr_w('mainMenu_v2')
-    ext.emit(0x4a00)                                # tst.b d0
-    ext.bne_w('browser_err_exit')
-    ext.emit(0x4ef9, 0x00ff, 0x0ff6)                # jmp $ff0ff6.l
-    ext.label('browser_err_exit')
-    ext.emit(0x4ef9, 0x00ff, 0x0f3a)                # jmp $ff0f3a.l
 
     code_end_off = len(ext.buf)
 
@@ -1254,6 +1249,7 @@ def build_custom_mdos():
         (13, 16, 'str_ri_cop', 0x00FFC710),
         (15, 14, 'str_ri_ser', 0x00FFC780),
         (17, 16, 'str_ri_reg', 0x00FFC7F0),
+        (21, 26, 'str_ri_art', 0x00FFC580),        # box-art path (calcRomArtPath)
     ]
     for y, mlen, lbl_name, hdr_addr in ri_entries:
         ext.emit(y, mlen)
@@ -1318,6 +1314,14 @@ def build_custom_mdos():
 
     ext.label('str_banner_tiles')
     ext.emit_str(bytes(range(0x88, 0x98)))
+
+    ext.label('art_params')                         # loadTileFile: path, palette, VRAM
+    ext.emit_l(0x00FFC580, 3, 0x2000)
+    ext.label('banner_params')
+    ext.emit_l(0, 2, 0x2E00)
+    ext.fixups.append((len(ext.buf) - 12, 'str_banner_path', 'abs32'))
+    ext.label('str_banner_path')
+    ext.emit_str(b'/EDMD/BANNER.ART')
 
     ext.label('str_art_prefix')
     ext.emit_str(b'/EDMD/ART/')
@@ -1700,14 +1704,19 @@ def build_custom_mdos():
     #   0xFF6B08..0xFF6BE7 ("Assembly Date:" .. "C - main menu")
     # =========================================================================
     blkA = Asm68k(0xFF6854)
-    # drawArtTiles(d5 = x, d6 = y): writes the 12x9 art tiles 0x100.. straight into the
-    # name table (gPrintChar only takes 8-bit codes) with the palette-3 attribute.
+    # drawArtTiles(d5 = x, d6 = y): the 12x9 box-art tiles 0x100.. in palette 3
     blkA.label('drawArtTiles')
-    blkA.emit(0x4878, 0x0003)                       # pea.l $3.w (Pal 3)
-    blkA.emit(0x4eb9, 0x00ff, 0x30a0)               # jsr $ff30a0.l (gSetPal -> $ffc476)
-    blkA.emit(0x588f)                               # addq.l #4, a7
-    blkA.emit(0x363c, 0x0100)                       # move.w #$100, d3
-    blkA.label('dat_row')
+    blkA.emit(0x48e7, 0x3880)                       # movem.l d2-d4/d6, -(a7)
+    blkA.emit(0x363c, 0x6100)                       # move.w #$6100, d3 (palette 3, tile 0x100)
+    blkA.emit(0x780b)                               # moveq #11, d4 (12 wide)
+    blkA.emit(0x7408)                               # moveq #8, d2 (9 rows)
+    blkA.b_s(0x61, 'drawTiles')
+    blkA.emit(0x4cdf, 0x011c)                       # movem.l (a7)+, d2-d4/d6
+    blkA.emit(0x4e75)                               # rts
+    # drawTiles(d3 = first name-table word, d4 = width - 1, d2 = rows - 1, d5 = x, d6 = y):
+    # consecutive tiles straight into the name table (gPrintChar only takes 8-bit codes).
+    # Uses d0-d3/d6/a0-a1.
+    blkA.label('drawTiles')
     blkA.emit(0x2f06)                               # move.l d6, -(a7) (y)
     blkA.emit(0x2f05)                               # move.l d5, -(a7) (x)
     blkA.pea_label('str_empty')
@@ -1725,16 +1734,13 @@ def build_custom_mdos():
     blkA.emit(0xe558)                               # rol.w #2, d0
     blkA.emit(0x0240, 0x0003)                       # andi.w #3, d0
     blkA.emit(0x23c0, 0x00c0, 0x0004)               # move.l d0, $c00004.l
-    blkA.emit(0x740b)                               # moveq #11, d2
-    blkA.label('dat_col')
-    blkA.emit(0x3003)                               # move.w d3, d0
-    blkA.emit(0x8079, 0x00ff, 0xc476)               # or.w $ffc476.l, d0 (palette attribute)
-    blkA.emit(0x33c0, 0x00c0, 0x0000)               # move.w d0, $c00000.l
+    blkA.emit(0x3204)                               # move.w d4, d1
+    blkA.label('dt_col')
+    blkA.emit(0x33c3, 0x00c0, 0x0000)               # move.w d3, $c00000.l
     blkA.emit(0x5243)                               # addq.w #1, d3
-    blkA.dbra(2, 'dat_col')
+    blkA.dbra(1, 'dt_col')
     blkA.emit(0x5246)                               # addq.w #1, d6
-    blkA.emit(0x0c43, 0x016c)                       # cmpi.w #$16c, d3 (108 tiles)
-    blkA.bcs_w('dat_row')
+    blkA.dbra(2, 'drawTiles')
     blkA.emit(0x4e75)                               # rts
 
     blkB = Asm68k(0xFF6B08)
@@ -1802,6 +1808,15 @@ def build_custom_mdos():
     blkB.emit(0x33fc, 0x0001, 0x00ff, 0x8008)       # move.w #1, $ff8008.l
     blkB.label('rf_r')
     blkB.emit(0x4e75)                               # rts
+
+    # browser C button -> PT-BR main menu (moved here from ext for space)
+    blkB.label('call_mainMenu_from_browser')
+    blkB.bsr_w('mainMenu_v2')
+    blkB.emit(0x4a00)                               # tst.b d0
+    blkB.bne_w('browser_err_exit')
+    blkB.emit(0x4ef9, 0x00ff, 0x0ff6)                # jmp $ff0ff6.l
+    blkB.label('browser_err_exit')
+    blkB.emit(0x4ef9, 0x00ff, 0x0f3a)                # jmp $ff0f3a.l
 
     # Combine all labels across all blocks and resolve fixups
     all_labels = {}
@@ -1875,6 +1890,11 @@ def build_custom_mdos():
     #     file name bar (like the v1); the top bar keeps only the centred banner.
     assert rom[0x09E2:0x09E6] == bytes.fromhex('48780001')
     rom[0x09E5] = 24
+    # B5. No top bar on plane B any more: its two fills (y=1) repaint the bottom bar (y=25)
+    #     instead, so the banner (rows 0-2) sits on black like in the v1.
+    for off in (0x0964, 0x099E):
+        assert rom[off:off + 4] == bytes.fromhex('48780001'), hex(off)
+        rom[off + 3] = 0x19
 
     # C. Hook browser C-button Main Menu call (0x0FF0) -> call_mainMenu_from_browser
     patch_long(0x0FF2, 0x00FF50BC, all_labels['call_mainMenu_from_browser'])

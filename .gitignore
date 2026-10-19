@@ -22,6 +22,7 @@
 !/build_v3_dumper.py
 !/extract_sram_dump.py
 !/sync_roms_art.py
+!/make_banner.py
 
 # código-fonte do mod v1 (sem a pasta build/, que é gerada)
 !/v1mod/

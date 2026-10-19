@@ -65,6 +65,13 @@ ramIdle:                        /* browser waiting for input (was a PAD polling 
     bra.s   1b
 2:  rts
 
+    .globl  ramBrowserBanner
+ramBrowserBanner:               /* browser full redraw (was move.b #1,$ffe306 at $ff64a8) */
+    move.b  #1, (0xFFE306).l
+    CHECK   1f
+    jmp     browserBanner
+1:  rts
+
 #ifdef DIAG
 /* timing probes: entry of the status print, flash erase, flash write and checksum copy.
  * Fallbacks run the displaced stock instructions and continue in the stock routine. */

@@ -16,7 +16,7 @@ MEMORY
 SECTIONS
 {
     .text : { *(.text .text.*) *(.rodata .rodata.*) } > ROMA
-    .strb : { *(.strb) } > ROMB
+    .strb : { *(.strb) *(.strb.text) } > ROMB
     .diag : { *(.diag) *(.diagro) } > ROMD
     .strc : { *(.strc) } > ROMC
     .ramstub : { *(.ramstub) } > RAM AT > ROMA

@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `cec64c64105a4a7e2e3a291ebfda1c2121b2879ec905622b81b03d61d2c32057` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `5cbf120299637b88f61f3517b167596aa42d606a7f83191b0a827fd08ca9515b` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `1e7d659490497e1a215cf2d42f5aefc173bbdf25e8e38d2b3f390f5b16b4e813` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `243d9d1e1f767c58d0f29f7d5630226b6b9b1f8318538b0b5804804c92a359d9` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -21,7 +21,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 
 - **Tudo em português**, com acentos (á à â ã é ê í ó ô õ ú ç) desenhados no estilo da fonte original
-- **Banner "RETROGAMER POA"** nos menus e tela de créditos com o grupo
+- **Banner "RETROGAMER POA"** no topo da lista de jogos e dos menus, e tela de créditos com o grupo;
+  pode ser trocado por uma **imagem sua** (veja [Banner personalizado](#banner-personalizado))
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
   nos recentes; o último item da lista, **Limpar recentes**, apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
@@ -63,7 +64,7 @@ Menu do jogo: **Carregar e jogar**, **Só carregar**, **Adicionar aos favoritos*
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.8**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.9**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -92,9 +93,26 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.8**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.9**.
 
 ---
+
+## Banner personalizado
+
+O banner do topo (lista de jogos, menus, menu do jogo, Info da ROM) pode ser uma imagem colorida.
+Sem o arquivo, aparece o banner "RETROGAMER POA" padrão.
+
+- Tamanho: **288×24 px** (36×3 tiles), até **14 cores** (a paleta do Mega Drive tem 512 cores; o
+  conversor ajusta). Use um fundo opaco: a imagem é desenhada inteira.
+- Converta e copie para o cartão SD em **`/EDMD/BANNER.ART`** (vale para v1 e v3):
+
+```
+pip install pillow
+python make_banner.py meu_banner.png E:\EDMD\BANNER.ART
+```
+
+Imagens de outro tamanho são redimensionadas e cortadas no centro. Pixel art com até 14 cores fica
+idêntica; imagens com mais cores são reduzidas para 14.
 
 ## Capas (box art)
 
@@ -161,7 +179,8 @@ pip install unicorn==2.1.4 pillow capstone
 # gera um cartão SD de teste (FAT32) via mtools/dosfstools no WSL: mkimg.py + mkimg.sh
 python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py
 # v3 (emu3.py, mesmo emulador com BIOS do cartucho simulado)
-python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py ; python t3_flicker.py
+python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py ; python t3_flicker.py ; python t3_banner.py
+# banner: t_banner.py / t3_banner.py usam sd/sdb.img (o sd.img com /EDMD/BANNER.ART)
 ```
 
 **v3** — rode a partir da pasta acima de `mega-genesis/`:

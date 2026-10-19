@@ -5,6 +5,12 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.9 — 2026-10-18
+- **Banner com imagem**: `/EDMD/BANNER.ART` (288×24 px, até 14 cores, gerado com `make_banner.py`)
+  aparece no topo dos menus, do menu do jogo e da lista de jogos. Sem o arquivo, fica o banner padrão.
+- A **lista de jogos ganhou o banner**: desceu uma linha (lista nas linhas 3-23, página na 24, nome
+  do arquivo na 25-26) para abrir espaço no topo.
+
 ### 1.8 — 2026-10-18
 - Sem mudanças de código; só a versão (mesma numeração da v3).
 
@@ -66,6 +72,12 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.9 — 2026-10-18
+- **Banner com imagem**: o mesmo `/EDMD/BANNER.ART` da v1, no topo da lista de jogos, do menu do
+  arquivo e da Info da ROM. Sem o arquivo, fica o banner padrão.
+- A barra cinza do topo da lista saiu: o banner fica sobre o fundo preto, como na v1.
+- A capa e o banner usam o mesmo carregador de `.ART`; código compactado para caber.
 
 ### 1.8 — 2026-10-18
 - **Correção:** a tela de créditos mostrava "repetir óltimo jogo". A fonte ganhou o "ú" (no lugar do

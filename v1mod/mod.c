@@ -56,6 +56,12 @@ static u8 gSector0[512] __attribute__((aligned(4)));   /* SD/OS routines access 
 static u8 gArtBuf[512] __attribute__((aligned(4)));
 static u32 gArtHash;
 static u8 gArtCache;                    /* 0 none, 1 = art of gArtHash is in VRAM, 2 = it has no art */
+/* code that does not fit in ROMA goes with the strings in the blank POA logo rows (ROMB) */
+#define ROMB_CODE __attribute__((section(".strb.text")))
+
+static u8 gBanner;                      /* 0 not tried yet, 1 no image, 2 /EDMD/BANNER.ART loaded */
+static u16 gBannerPal[14];
+#define BANNER_IMG_TILE 0x100           /* VRAM 0x2000: the 36x3 image banner */
 #define PREV_TOP 8                       /* cover box: rows 8..16 (middle of the list), cols 27..38 */
 
 #define PREVIEW_DELAY 19                /* frames resting on a ROM before its cover loads (~0.32 s) */
@@ -181,13 +187,54 @@ static void applyTheme(void)
     osSetColor(2, 1, 0x008);            /* banner bar: crimson */
     osSetColor(2, 2, 0x0CE);            /* banner letters: gold */
     osSetColor(2, 3, 0x002);            /* banner letter shadow */
+    if (gBanner == 2) {                 /* image banner: palette 2 colours 1..14 */
+        int i;
+        for (i = 0; i < 14; i++)
+            osSetColor(2, i + 1, gBannerPal[i]);
+    }
+}
+
+static int readArtFile(u16 tile, u16 *pal, int abortable);
+
+/* /EDMD/BANNER.ART: same layout as a box-art file, 36x3 tiles (288x24 px) */
+ROMB_CODE static void loadBanner(void)
+{
+    gBanner = 1;
+    if (!FAT_READY) {
+        if (osFatInit())
+            return;
+        FAT_READY = 1;
+    }
+    if (osFind(S_banner_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0)
+        || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0))
+        return;
+    gBanner = 2;
+    applyTheme();
+}
+
+/* RETROGAMER POA on top: the image banner (rows 0-2) or the built-in one (row 1) */
+ROMB_CODE static void drawBanner(u32 plane)
+{
+    if (!gBanner)
+        loadBanner();
+    if (gBanner == 2)
+        osFillSeq(plane, PAL2 | BANNER_IMG_TILE, 2, 0, 36, 3);
+    else
+        osPrintAl(plane, S_banner, PAL2, 20, 1, ALIGN_CENTER);
+}
+
+/* browser full redraw (ramBrowserBanner): its list starts on row 3 to make room. Plane B,
+ * because entering a folder clears rows 0-24 of plane A only. */
+void browserBanner(void)
+{
+    drawBanner(PLANE_B);
 }
 
 /* called by osMenu instead of its screen clear (through the RAM guard) */
 void myMenuClear(void)
 {
     osClear();
-    center(S_banner, PAL2, 1);
+    drawBanner(PLANE_A);
     if (gOverlay)
         gOverlay();
 }
@@ -317,14 +364,14 @@ static int listAdd(int l, const Rec *r)
     return 1;
 }
 
-static void listClear(int l)
+ROMB_CODE static void listClear(int l)
 {
     scratchLoad();
     SCR_HDR->count[l] = 0;
     scratchCommit();
 }
 
-static void listRemove(int l, int idx)
+ROMB_CODE static void listRemove(int l, int idx)
 {
     ListEnt *list;
     int n, i;
@@ -842,10 +889,29 @@ static int readSector0(Rec *r, void *dst)
  * The .ART file is streamed sector by sector through gArtBuf so the browser page cache survives.
  * abortable: give up as soon as a button is pressed (returns 0, nothing cached).
  */
+ROMB_CODE static int readArtFile(u16 tile, u16 *pal, int abortable)
+{
+    int s, i;
+    for (s = 0; s < 7; s++) {           /* 32-byte palette, then 108 tiles: 16 slots per sector */
+        int first = s ? 0 : 1, t = s * 16 + first - 1, n = 16 - first;
+        if ((abortable && PAD) || osRead(gArtBuf, 1))
+            return 0;
+        if (!s)
+            for (i = 0; i < 14; i++)
+                pal[i] = ((u16 *)gArtBuf)[i + 1];
+        if (t + n > 108)
+            n = 108 - t;
+        if (n > 0)
+            osLoadTiles(gArtBuf + first * 32, tile + t, n, 0);
+    }
+    return 1;
+}
+
 static int loadArt(int abortable)
 {
     u32 h = 0;
-    int i, s;
+    u16 pal[14];
+    int i;
     char *p;
 
     gArtOk = gHdrOk = 0;
@@ -871,18 +937,10 @@ static int loadArt(int abortable)
         gArtCache = 2;
         return 1;
     }
-    for (s = 0; s < 7; s++) {           /* 32-byte palette, then 108 tiles: 16 slots per sector */
-        int first = s ? 0 : 1, t = s * 16 + first - 1, n = 16 - first;
-        if ((abortable && PAD) || osRead(gArtBuf, 1))
-            return 0;
-        if (!s)
-            for (i = 1; i < 15; i++)
-                osSetColor(3, i, ((u16 *)gArtBuf)[i]);
-        if (t + n > 108)
-            n = 108 - t;
-        if (n > 0)
-            osLoadTiles(gArtBuf + first * 32, 0x80 + t, n, 0);
-    }
+    if (!readArtFile(0x80, pal, abortable))
+        return 0;
+    for (i = 0; i < 14; i++)
+        osSetColor(3, i + 1, pal[i]);
     gArtHash = h;
     gArtCache = 1;
     gArtOk = 1;
@@ -1050,6 +1108,7 @@ u32 fileMenuFromBrowser(u32 idx)
         }
     }
     osClear();
+    drawBanner(PLANE_B);                /* the browser only redraws the list (plane A) */
     PAGE_CACHE = 0xFFFF;
     return idx;
 }
