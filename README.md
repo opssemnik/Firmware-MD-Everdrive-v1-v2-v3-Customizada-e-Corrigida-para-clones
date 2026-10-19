@@ -8,8 +8,17 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `4d43a657122a0428a75cbdcc57ed219156be83f807c86665461fcddd88bf080a` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `84721328cc5b230e1ee9458e6885d584e214ac6db075ebebc7574d2824fa9ee3` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `8b43acefd6ae68ab46bf14dd28f6f7ed1eb174947b1ccf4edfbc55cde4edc309` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `2c9a630a8cc4ddd64be4c9e724166b62109f19d85339df87347412348a1168c2` |
+
+**Releases** ([página de Releases](../../releases)), 4 arquivos:
+
+| Arquivo | O que é |
+|---|---|
+| `OS-V38-PTBR.BIN` | firmware da v1 (gravar pelo próprio cartucho) |
+| `MDOS.BIN` | firmware da v3, já com o nome certo |
+| `SD-EverDrive-v1.zip` | pasta `EDMD` para a raiz do cartão SD: capas, banner e wallpaper |
+| `SD-EverDrive-v3.zip` | o mesmo, mais `EDMD/MDOS.BIN` (o firmware da v3) |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -29,6 +38,8 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 - **Capas (box art)** dos jogos, lidas de `/EDMD/ART` no cartão SD
 - **Info da ROM**: nome, console, copyright, serial, região, checksum e tamanho lidos do cabeçalho SEGA
 - **4 temas de cores**: PADRÃO, RG POA, SEGA 16 e OUTRUN
+- **Wallpaper** atrás da lista de jogos e dos menus (veja [Wallpaper](#wallpaper)), com uma arte
+  retrô própria inclusa, livre para compartilhar
 
 | | | |
 |---|---|---|
@@ -36,6 +47,11 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 | Capa aparece ao parar sobre um jogo (v1) | Menu do jogo (botão A) | Info da ROM |
 
 ![Temas](v1mod/screens/temas.png)
+
+| | |
+|---|---|
+| ![Wallpaper v1](v1mod/screens/lista_wallpaper.png) | ![Wallpaper v3](v3/screens/lista_wallpaper.png) |
+| Banner e wallpaper inclusos (v1) | Banner e wallpaper inclusos (v3) |
 
 ---
 
@@ -66,7 +82,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.13**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.14**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -78,8 +94,9 @@ Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (
 ## EverDrive-MD v3
 
 ### Instalação
-O v3 carrega o OS do cartão SD. Renomeie `MDOS.ptbr.BIN` para **`MDOS.BIN`** e coloque em
-**`/EDMD/MDOS.BIN`** no cartão. Para voltar ao original, basta recolocar o `MDOS.BIN` original.
+O v3 carrega o OS do cartão SD: o firmware fica em **`/EDMD/MDOS.BIN`**. O jeito mais fácil é extrair o
+`SD-EverDrive-v3.zip` da release na raiz do cartão (já traz o `MDOS.BIN`, capas, banner e wallpaper).
+Compilando você mesmo, renomeie `MDOS.ptbr.BIN` para `MDOS.BIN`. Para voltar ao original, basta recolocar o `MDOS.BIN` original.
 
 O nome e a pasta precisam ser exatamente esses: a BIOS só carrega os primeiros 32 KB do arquivo, e as
 telas de Info da ROM, Opções, Recentes/Favoritos, Créditos e *Jogar com Cheats* são lidas do resto do
@@ -99,14 +116,15 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.13**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.14**.
 
 ---
 
 ## Banner personalizado
 
 O banner do topo (lista de jogos, menus, menu do jogo, Info da ROM) pode ser uma imagem colorida.
-Sem o arquivo, aparece o banner "RETROGAMER POA" padrão.
+Sem o arquivo, aparece o banner "RETROGAMER POA" padrão. O repositório e os zips da release já trazem
+um banner retrô próprio em `sd/EDMD/BANNER.ART` (gerado por [`arte/gen_arte.py`](arte/gen_arte.py)).
 
 - Tamanho: **288×24 px** (36×3 tiles), até **13 cores** (a paleta do Mega Drive tem 512 cores; o
   conversor ajusta). A cor 1 da paleta fica reservada para o vermelho da faixa de destaque dos menus.
@@ -122,16 +140,35 @@ Imagens de outro tamanho são redimensionadas e cortadas no centro. Pixel art co
 idêntica; imagens com mais cores são reduzidas para 13. `BANNER.ART` gerados antes da versão 1.11
 precisam ser convertidos de novo.
 
+## Wallpaper
+
+Uma imagem atrás da lista de jogos e dos menus, em `/EDMD/WALL.ART` (vale para v1 e v3). Sem o
+arquivo, o fundo continua liso. O repositório e os zips da release já trazem um wallpaper retrô
+próprio (`sd/EDMD/WALL.ART`, de [`arte/gen_arte.py`](arte/gen_arte.py)).
+
+- Tamanho **320×224 px**, até **14 cores**; o preto puro fica transparente e mostra a cor de fundo do tema.
+- Use uma imagem **escura**: o texto da lista fica por cima. O conversor escurece com `--dim`.
+- Cabem até **800 tiles** diferentes (8×8). Pixel art e padrões repetidos cabem fácil; numa foto o
+  conversor junta os tiles mais parecidos até caber, perdendo um pouco de detalhe.
+
+```
+pip install pillow
+python make_wallpaper.py meu_wallpaper.png E:/EDMD/WALL.ART --dim 0.55
+```
+
 ## Capas (box art)
 
-O repositório já traz **2176 capas prontas** em [`sd/EDMD/ART`](sd/EDMD/ART) (também disponíveis
-como `EDMD-ART.zip` na página de Releases).
+O repositório já traz **2176 capas prontas** em [`sd/EDMD/ART`](sd/EDMD/ART) (também dentro dos
+`SD-EverDrive-v1.zip` / `SD-EverDrive-v3.zip` da página de Releases).
 
 **Onde colocar:** copie a pasta `EDMD` de dentro de `sd/` para a **raiz do cartão SD**, ficando assim:
 
 ```
 Cartão SD (E:\)
 ├── EDMD\
+│   ├── BANNER.ART        (banner, opcional)
+│   ├── WALL.ART          (wallpaper, opcional)
+│   ├── MDOS.BIN          (só v3: o firmware)
 │   ├── ART\
 │   │   ├── 0C4F65A0.ART
 │   │   ├── 3F75B964.ART
@@ -189,7 +226,7 @@ python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py
 # v3 (emu3.py, mesmo emulador com BIOS do cartucho simulado)
 python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py ; python t3_flicker.py ; python t3_banner.py ; python t3_ovl.py ; python t3_nomdos.py
 # v3: rode sdput.sh (WSL) depois de compilar, para copiar o MDOS.BIN novo para as imagens do SD
-# banner: t_banner.py / t3_banner.py usam sd/sdb.img (o sd.img com /EDMD/BANNER.ART)
+# banner: t_banner.py / t3_banner.py usam sd/sdb.img; wallpaper: t_wall.py v1|v3 usa sd/sdw.img
 ```
 
 **v3** — rode a partir da pasta acima de `mega-genesis/`:

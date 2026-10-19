@@ -1,9 +1,16 @@
 # Mudanças
 
 ## Capas
+- `sd/EDMD/BANNER.ART` e `sd/EDMD/WALL.ART`: banner e wallpaper retrô próprios (desde a 1.14).
 - 2176 capas `.ART` prontas em `sd/EDMD/ART` (geradas com `sync_roms_art.py` a partir da libretro-thumbnails).
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
+
+### 1.14 — 2026-10-19
+- **Wallpaper**: `/EDMD/WALL.ART` (320×224, até 14 cores, gerado com `make_wallpaper.py`) atrás da
+  lista de jogos e dos menus. Mesmo arquivo para v1 e v3.
+- Banner e wallpaper retrô próprios (livres para compartilhar) em `sd/EDMD`, gerados por `arte/gen_arte.py`.
+- O banner de imagem passou para a VRAM 0x2E00 (mesmo lugar da v3); o wallpaper usa 0x3B80-0x9FFF.
 
 ### 1.13 — 2026-10-19
 - **Jogar com cheats** no menu do jogo (botão A): carrega o jogo, abre o menu de códigos Game Genie
@@ -88,6 +95,13 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.14 — 2026-10-19
+- **Wallpaper**: `/EDMD/WALL.ART` (320×224, até 14 cores, gerado com `make_wallpaper.py`) atrás da
+  lista de jogos e dos menus. Mesmo arquivo para v1 e v3.
+- Banner e wallpaper retrô próprios (livres para compartilhar) em `sd/EDMD`, gerados por `arte/gen_arte.py`.
+- No boot, as tabelas de vídeo (janela, sprites, rolagem horizontal) ficam em 0xB000-0xBFFF, como na
+  v1, para liberar a VRAM do wallpaper.
 
 ### 1.13 — 2026-10-19
 - **Jogar com Cheats** no menu do arquivo (botão A): carrega o jogo, abre o editor de cheats

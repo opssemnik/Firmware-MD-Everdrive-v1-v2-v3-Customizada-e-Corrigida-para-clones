@@ -61,7 +61,13 @@ static u8 gArtCache;                    /* 0 none, 1 = art of gArtHash is in VRA
 
 static u8 gBanner;                      /* 0 not tried yet, 1 no image, 2 /EDMD/BANNER.ART loaded */
 static u16 gBannerPal[14];
-#define BANNER_IMG_TILE 0x100           /* VRAM 0x2000: the 36x3 image banner */
+#define BANNER_IMG_TILE 0x170           /* VRAM 0x2E00: the 36x3 image banner (same place as on the v3) */
+#define WALL_TILE 0x1DC                 /* VRAM 0x3B80..0x9FFF: up to 800 wallpaper tiles (as on the v3) */
+#define WALL_MAP 0x0100                 /* VRAM copy of the wallpaper's 40x28 plane B names (2240 bytes) */
+#define WALL_MAX 800
+static u8 gWall;                        /* 1 = /EDMD/WALL.ART loaded */
+#define VDP_DATA (*(volatile u16 *)0xC00000)
+#define VDP_CTRL (*(volatile u32 *)0xC00004)
 #define PREV_TOP 10                      /* cover box: rows 10..18 (middle of the list), cols 27..38 */
 
 #define PREVIEW_DELAY 19                /* frames resting on a ROM before its cover loads (~0.32 s) */
@@ -199,12 +205,6 @@ static int readArtFile(u16 tile, u16 *pal, int abortable);
 /* /EDMD/BANNER.ART: same layout as a box-art file, 36x3 tiles (288x24 px) */
 ROMB_CODE static void loadBanner(void)
 {
-    gBanner = 1;
-    if (!FAT_READY) {
-        if (osFatInit())
-            return;
-        FAT_READY = 1;
-    }
     if (osFind(S_banner_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0)
         || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0))
         return;
@@ -212,11 +212,77 @@ ROMB_CODE static void loadBanner(void)
     applyTheme();
 }
 
+/* /EDMD/WALL.ART (make_wallpaper.py): word 0 = tile count, palette 1 colours 1..14, the 40x28
+ * plane B names (palette and tile numbers already in place) -> VRAM WALL_MAP, then the tiles.
+ * After the 32-byte header everything is 32-byte blocks, so it streams with osLoadTiles. */
+ROMB_CODE static void loadWallpaper(void)
+{
+    u32 b = 0, n = 0;
+    int s, i;
+
+    if (osFind(S_wall_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0))
+        return;
+    for (s = 0;; s++) {
+        if (osRead(gArtBuf, 1))
+            return;
+        if (!s) {
+            n = ((u16 *)gArtBuf)[0];
+            if (n > WALL_MAX)
+                return;
+            for (i = 1; i < 15; i++)
+                osSetColor(1, i, ((u16 *)gArtBuf)[i]);
+        }
+        for (i = s ? 0 : 1; i < 16; i++, b++) {
+            if (b >= 70 + n) {
+                gWall = 1;
+                return;
+            }
+            osLoadTiles(gArtBuf + i * 32, b < 70 ? WALL_MAP / 32 + b : WALL_TILE + b - 70, 1, 0);
+        }
+    }
+}
+
+/* first banner/wallpaper use: mount the card (once) and load both images */
+ROMB_CODE static void loadImages(void)
+{
+    gBanner = 1;
+    if (!FAT_READY) {
+        if (osFatInit())
+            return;
+        FAT_READY = 1;
+    }
+    loadBanner();
+    loadWallpaper();
+}
+
+/* the wallpaper on plane B: its names are copied from the VRAM copy, row by row */
+ROMB_CODE static void drawWallpaper(void)
+{
+    u16 row[40], sr;
+    int y, x;
+
+    if (!gBanner)
+        loadImages();
+    if (!gWall)
+        return;
+    asm volatile("move.w %%sr, %0\n\tmove.w #0x2700, %%sr" : "=d"(sr));     /* no VInt meanwhile */
+    for (y = 0; y < 28; y++) {
+        u32 src = WALL_MAP + y * 80, dst = PLANE_B + y * 128;
+        VDP_CTRL = ((src & 0x3FFF) << 16) | (src >> 14);                 /* VRAM read */
+        for (x = 0; x < 40; x++)
+            row[x] = VDP_DATA;
+        VDP_CTRL = 0x40000000 | ((dst & 0x3FFF) << 16) | (dst >> 14);    /* VRAM write */
+        for (x = 0; x < 40; x++)
+            VDP_DATA = row[x];
+    }
+    asm volatile("move.w %0, %%sr" : : "d"(sr));
+}
+
 /* RETROGAMER POA on top: the image banner (rows 0-2) or the built-in one (row 1) */
 ROMB_CODE static void drawBanner(u32 plane)
 {
     if (!gBanner)
-        loadBanner();
+        loadImages();
     if (gBanner == 2)
         osFillSeq(plane, PAL2 | BANNER_IMG_TILE, 2, 0, 36, 3);
     else
@@ -227,6 +293,7 @@ ROMB_CODE static void drawBanner(u32 plane)
  * because entering a folder clears rows 0-24 of plane A only. */
 void browserBanner(void)
 {
+    drawWallpaper();
     drawBanner(PLANE_B);
 }
 
@@ -234,6 +301,7 @@ void browserBanner(void)
 void myMenuClear(void)
 {
     osClear();
+    drawWallpaper();
     drawBanner(PLANE_A);
     if (gOverlay)
         gOverlay();
@@ -1123,6 +1191,7 @@ u32 fileMenuFromBrowser(u32 idx)
         }
     }
     osClear();
+    drawWallpaper();
     drawBanner(PLANE_B);                /* the browser only redraws the list (plane A) */
     PAGE_CACHE = 0xFFFF;
     return idx;

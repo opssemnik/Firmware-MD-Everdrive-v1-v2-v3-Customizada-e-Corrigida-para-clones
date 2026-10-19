@@ -23,6 +23,10 @@
 !/extract_sram_dump.py
 !/sync_roms_art.py
 !/make_banner.py
+!/make_wallpaper.py
+
+# arte própria (banner e wallpaper), livre para compartilhar
+!/arte/
 
 # código-fonte do mod v1 (sem a pasta build/, que é gerada)
 !/v1mod/

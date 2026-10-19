@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.13'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.14'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -77,6 +77,7 @@ C_STRINGS = {
     'S_no_art': 'sem capa',
     'S_art_prefix': '/EDMD/ART/',
     'S_banner_path': '/EDMD/BANNER.ART',
+    'S_wall_path': '/EDMD/WALL.ART',
     'S_ri_title': 'Info da ROM (cabeçalho SEGA)',
     'S_ri_us': 'Nome US/EU:',
     'S_ri_jp': 'Nome JP:',

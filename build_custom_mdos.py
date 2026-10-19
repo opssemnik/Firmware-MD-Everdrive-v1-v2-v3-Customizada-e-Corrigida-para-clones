@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.13'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.14'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -549,8 +549,146 @@ def build_custom_mdos():
     ext.emit(0x4fef, 0x0018)                        # lea.l $18(a7), a7
     ext.bsr_w('applyTheme')
     ext.emit(0x42b9, 0x00ff, 0xc5a0)                # clr.l $ffc5a0.l (L/R flags + cursor)
-    ext.emit(0x4239, 0x00ff, 0xc5a4)                # clr.b $ffc5a4.l (image banner: not tried yet)
+    ext.emit(0x4279, 0x00ff, 0xc5a4)                # clr.w $ffc5a4.l (banner, wallpaper: not tried yet)
+    # Fixed VDP table addresses (the cart BIOS picks them; the v1 OS uses these): window 0xB000,
+    # sprites 0xBC00, H scroll 0xB800, then zero the H scroll table and sprite 0. VRAM below 0xA000
+    # is then free for the wallpaper tiles.
+    ext.emit(0x40e7)                                # move.w sr, -(a7)
+    ext.emit(0x007c, 0x0700)                        # ori.w #$700, sr
+    ext.emit(0x41f9, 0x00c0, 0x0004)                # lea.l $c00004.l, a0
+    ext.emit(0x30bc, 0x832c)                        # move.w #$832c, (a0) (window 0xB000)
+    ext.emit(0x30bc, 0x855e)                        # move.w #$855e, (a0) (sprites 0xBC00)
+    ext.emit(0x30bc, 0x8d2e)                        # move.w #$8d2e, (a0) (H scroll 0xB800)
+    ext.emit(0x20bc, 0x7800, 0x0002)                # move.l #$78000002, (a0) (VRAM write 0xB800)
+    ext.emit(0x303c, 0x0203)                        # move.w #$203, d0 (0xB800..0xBC07)
+    ext.label('bi_hs_clr')
+    ext.emit(0x4279, 0x00c0, 0x0000)                # clr.w $c00000.l
+    ext.dbra(0, 'bi_hs_clr')
+    ext.emit(0x46df)                                # move.w (a7)+, sr
     ext.emit(0x4cdf, 0x0c3c)                        # movem.l (a7)+, d2-d5/a2-a3
+    ext.emit(0x4e75)                                # rts
+
+    # 3b. wallHook: end of ff37c2 (clear one plane, jmp from 0xFF37E0): after plane B is cleared the
+    # wallpaper goes back in. wallDraw copies its names (VRAM 0x1400) to rows 0-25 of the plane B
+    # page being drawn (rows 26-27 hold the file name bar).
+    ext.label('wallHook')
+    ext.emit(0x4fef, 0x0018)                        # lea.l $18(a7), a7 (the replaced instructions)
+    ext.emit(0x0c6f, 0xe000, 0x0006)                # cmpi.w #$e000, 6(a7) (plane B?)
+    ext.bne_w('wh_ret')
+    ext.label('wallDraw')
+    ext.emit(0x0c39, 0x0002, 0x00ff, 0xc5a5)        # cmpi.b #2, $ffc5a5.l (loaded?)
+    ext.bne_w('wh_ret')
+    ext.emit(0x48e7, 0x3820)                        # movem.l d2-d4/a2, -(a7)
+    ext.emit(0x40e7)                                # move.w sr, -(a7)
+    ext.emit(0x007c, 0x0700)                        # ori.w #$700, sr
+    ext.emit(0x4fef, 0xffb0)                        # lea.l -80(a7), a7 (one row)
+    ext.emit(0x41f9, 0x00c0, 0x0004)                # lea.l $c00004.l, a0
+    ext.emit(0x43f9, 0x00c0, 0x0000)                # lea.l $c00000.l, a1
+    ext.emit(0x343c, 0x1400)                        # move.w #$1400, d2 (names copy in VRAM)
+    ext.emit(0x363c, 0xe000)                        # move.w #$e000, d3 (plane B, page being drawn:
+    ext.emit(0x4a79, 0x00ff, 0xc470)                # tst.w $ffc470.l          + $1000 like ff3088)
+    ext.b_s(0x67, 'wh_page')
+    ext.emit(0x0643, 0x1000)                        # addi.w #$1000, d3
+    ext.label('wh_page')
+    ext.emit(0x7219)                                # moveq #25, d1 (rows 0-25)
+    ext.label('wh_row')
+    ext.emit(0x7000, 0x3002, 0xe588, 0xe448, 0x4840)    # d0 = VDP address command for d2 (read)
+    ext.emit(0x2080)                                # move.l d0, (a0)
+    ext.emit(0x244f)                                # movea.l a7, a2
+    ext.emit(0x7827)                                # moveq #39, d4
+    ext.label('wh_rd')
+    ext.emit(0x34d1)                                # move.w (a1), (a2)+
+    ext.dbra(4, 'wh_rd')
+    ext.emit(0x7000, 0x3003, 0xe588, 0xe448, 0x4840)    # d0 = VDP address command for d3
+    ext.emit(0x08c0, 0x001e)                        # bset #30, d0 (write)
+    ext.emit(0x2080)                                # move.l d0, (a0)
+    ext.emit(0x244f)                                # movea.l a7, a2
+    ext.emit(0x7827)                                # moveq #39, d4
+    ext.label('wh_wr')
+    ext.emit(0x329a)                                # move.w (a2)+, (a1)
+    ext.dbra(4, 'wh_wr')
+    ext.emit(0x0642, 0x0050)                        # addi.w #80, d2
+    ext.emit(0x0643, 0x0080)                        # addi.w #128, d3 (64-cell plane)
+    ext.dbra(1, 'wh_row')
+    ext.emit(0x4fef, 0x0050)                        # lea.l 80(a7), a7
+    ext.emit(0x46df)                                # move.w (a7)+, sr
+    ext.emit(0x4cdf, 0x041c)                        # movem.l (a7)+, d2-d4/a2
+    ext.label('wh_ret')
+    ext.emit(0x4e75)                                # rts
+
+    # 3c. loadWallpaper -> $ffc5a5 = 1 (none) / 2 (loaded). WALL.ART (make_wallpaper.py): word 0 = tile
+    # count (max 800), palette 1 colours 1..14, 2240 bytes of plane B names (palette/tiles in place)
+    # -> VRAM 0x1400, then the tiles -> VRAM 0x3B80. Read 7 sectors at a time through 0xFFC800.
+    ext.label('loadWallpaper')
+    ext.emit(0x48e7, 0x1820)                        # movem.l d3-d4/a2, -(a7)
+    ext.emit(0x13fc, 0x0001, 0x00ff, 0xc5a5)        # move.b #1, $ffc5a5.l
+    ext.emit(0x42a7)                                # clr.l -(a7)
+    ext.pea_label('str_wall_path')
+    ext.emit(0x4eb9, 0x00ff, 0x2f48)                # jsr $ff2f48.l (fatOpenFileByName)
+    ext.emit(0x508f)                                # addq.l #8, a7
+    ext.emit(0x4a00)                                # tst.b d0
+    ext.bne_w('lw_ret')
+    ext.bsr_w('lw_read')
+    ext.bne_w('lw_ret')
+    ext.emit(0x3839, 0x00ff, 0xc800)                # move.w $ffc800.l, d4 (tiles)
+    ext.emit(0x0c44, 800)                           # cmpi.w #800, d4
+    ext.emit(0x6200, 0x0000)                        # bhi.w lw_ret (too many: would reach the font)
+    ext.fixups.append((len(ext.buf) - 2, 'lw_ret', 'w16'))
+    ext.emit(0x45f9, 0x00ff, 0xc802)                # lea.l $ffc802.l, a2
+    ext.emit(0x7601)                                # moveq #1, d3
+    ext.label('lw_pal')
+    ext.emit(0x7000, 0x301a)                        # moveq #0, d0 ; move.w (a2)+, d0
+    ext.emit(0x2f00, 0x2f03)                        # push colour, index
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (palette 1)
+    ext.emit(0x4eb9, 0x00ff, 0x65ae)                # jsr $ff65ae.l (vdpSetPal)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x5243)                                # addq.w #1, d3
+    ext.emit(0x0c43, 0x000e)                        # cmpi.w #14, d3
+    ext.b_s(0x63, 'lw_pal')
+    ext.emit(0x4878, 2240)                          # pea.l 2240.w
+    ext.emit(0x4878, 0x1400)                        # pea.l $1400.w
+    ext.emit(0x4879, 0x00ff, 0xc820)                # pea.l $ffc820.l
+    ext.emit(0x45f9, 0x00ff, 0x651a)                # lea.l $ff651a.l, a2 (vdpVramWrite)
+    ext.emit(0x4e92)                                # jsr (a2)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0xe94c)                                # lsl.w #4, d4
+    ext.emit(0xd844)                                # add.w d4, d4 (tiles * 32 = bytes)
+    ext.emit(0x363c, 0x3b80)                        # move.w #$3b80, d3 (VRAM)
+    ext.emit(0x223c, 0x00ff, 0xd0e0)                # move.l #$ffd0e0, d1 (tiles after the names)
+    ext.emit(0x303c, 0x0520)                        # move.w #1312, d0 (rest of the first chunk)
+    ext.label('lw_chunk')
+    ext.emit(0xb840)                                # cmp.w d0, d4
+    ext.b_s(0x64, 'lw_n')                           # bcc.s
+    ext.emit(0x3004)                                # move.w d4, d0 (last piece)
+    ext.label('lw_n')
+    ext.emit(0x4a40)                                # tst.w d0
+    ext.b_s(0x67, 'lw_done')
+    ext.emit(0x9840)                                # sub.w d0, d4
+    ext.emit(0x2f00)                                # move.l d0, -(a7) (bytes)
+    ext.emit(0x2f03)                                # move.l d3, -(a7) (VRAM)
+    ext.emit(0x2f01)                                # move.l d1, -(a7) (source)
+    ext.emit(0xd640)                                # add.w d0, d3
+    ext.emit(0x4e92)                                # jsr (a2)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x4a44)                                # tst.w d4
+    ext.b_s(0x67, 'lw_done')
+    ext.bsr_w('lw_read')
+    ext.b_s(0x66, 'lw_ret')
+    ext.emit(0x223c, 0x00ff, 0xc800)                # move.l #$ffc800, d1
+    ext.emit(0x303c, 0x0e00)                        # move.w #3584, d0
+    ext.bra_w('lw_chunk')
+    ext.label('lw_done')
+    ext.emit(0x13fc, 0x0002, 0x00ff, 0xc5a5)        # move.b #2, $ffc5a5.l
+    ext.label('lw_ret')
+    ext.emit(0x4cdf, 0x0418)                        # movem.l (a7)+, d3-d4/a2
+    ext.emit(0x4e75)                                # rts
+    ext.label('lw_read')                            # next 7 sectors -> $ffc800; Z = ok
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w
+    ext.emit(0x4878, 0x0007)                        # pea.l $7.w
+    ext.emit(0x4879, 0x00ff, 0xc800)                # pea.l $ffc800.l
+    ext.emit(0x4eb9, 0x00ff, 0x23c6)                # jsr $ff23c6.l (fatRead)
+    ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ext.emit(0x4a00)                                # tst.b d0
     ext.emit(0x4e75)                                # rts
 
     # 4. applyTheme
@@ -811,8 +949,11 @@ def build_custom_mdos():
     ext.lea_pc(1, 'banner_params')
     ext.bsr_w('loadTileFile')
     ext.emit(0x4a00)                                # tst.b d0
-    ext.b_s(0x66, 'pb_tried')
+    ext.b_s(0x66, 'pb_wall')
     ext.emit(0x5239, 0x00ff, 0xc5a4)                # addq.b #1, $ffc5a4.l (2 = image loaded)
+    ext.label('pb_wall')
+    ext.bsr_w('loadWallpaper')                      # the wallpaper too (first browser page: card is up)
+    ext.bsr_w('wallDraw')
     ext.label('pb_tried')
     ext.emit(0x0c39, 0x0002, 0x00ff, 0xc5a4)        # cmpi.b #2, $ffc5a4.l
     ext.b_s(0x67, 'pb_image')
@@ -1179,6 +1320,8 @@ def build_custom_mdos():
     ext.label('banner_params')
     ext.emit_l(0, 2, 0x2E00)
     ext.fixups.append((len(ext.buf) - 12, 'str_banner_path', 'abs32'))
+    ext.label('str_wall_path')
+    ext.emit_str(b'/EDMD/WALL.ART')
     ext.label('str_banner_path')
     ext.emit_str(b'/EDMD/BANNER.ART')
 
@@ -2017,6 +2160,10 @@ def build_custom_mdos():
     for off in (0x0964, 0x099E):
         assert rom[off:off + 4] == bytes.fromhex('48780001'), hex(off)
         rom[off + 3] = 0x1A
+
+    # B7. wallpaper: end of the plane clear (ff37c2: lea $18(a7),a7; rts) -> jmp wallHook
+    assert rom[0x37E0:0x37E6] == bytes.fromhex('4fef00184e75')
+    struct.pack_into('>HI', rom, 0x37E0, 0x4EF9, all_labels['wallHook'])
 
     # B6. gDrawBox: highlight bar for the last item of the recents list
     assert rom[0x47EC:0x47F2] == bytes.fromhex('2ebc0000c000')
