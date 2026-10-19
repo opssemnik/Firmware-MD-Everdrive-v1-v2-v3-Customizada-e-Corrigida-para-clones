@@ -132,7 +132,7 @@ def build_font_and_banner_2bpp():
     """
     Builds 20 contiguous 2bpp tiles (320 bytes):
       - Tiles 0x80..0x87 (8 tiles): PT-BR accented glyphs matching Krikzz's 8x8 font
-          0x80 = ç, 0x81 = ã, 0x82 = õ, 0x83 = á, 0x84 = é, 0x85 = í, 0x86 = ó, 0x87 = Ã
+          0x80 = ç, 0x81 = ã, 0x82 = õ, 0x83 = á, 0x84 = é, 0x85 = ú, 0x86 = ó, 0x87 = Ã
       - Tiles 0x88..0x97 (16 tiles = 128x8 px): "RETROGAMER POA" banner in the OS font
     """
     accent_glyphs = [
@@ -191,15 +191,15 @@ def build_font_and_banner_2bpp():
             "..####..",
             "........",
         ],
-        # 0x85: í
+        # 0x85: ú (no v3 text uses í)
         [
             "....##..",
             "...##...",
-            "........",
-            "..###...",
-            "...##...",
-            "...##...",
-            "..####..",
+            ".##..##.",
+            ".##..##.",
+            ".##..##.",
+            ".##..##.",
+            "..#####.",
             "........",
         ],
         # 0x86: ó
@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.7'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.8'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -1488,7 +1488,7 @@ def build_custom_mdos():
     ext.label('str_ab_ctl_1')
     ext.emit_str(b'ESQ/DIR - mudar p\x83gina')
     ext.label('str_ab_ctl_2')
-    ext.emit_str(b'START - repetir \x86ltimo jogo')
+    ext.emit_str(b'START - repetir \x85ltimo jogo')
     ext.label('str_ab_ctl_3')
     ext.emit_str(b'A - menu do arquivo + Boxart')
     ext.label('str_ab_ctl_4')

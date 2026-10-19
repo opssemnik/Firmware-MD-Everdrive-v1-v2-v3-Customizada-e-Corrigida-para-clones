@@ -5,6 +5,9 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.8 — 2026-10-18
+- Sem mudanças de código; só a versão (mesma numeração da v3).
+
 ### 1.7 — 2026-10-18
 - Sem mudanças de código; só a versão (mesma numeração da v3).
 
@@ -63,6 +66,10 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.8 — 2026-10-18
+- **Correção:** a tela de créditos mostrava "repetir óltimo jogo". A fonte ganhou o "ú" (no lugar do
+  "í", que nenhum texto da v3 usa).
 
 ### 1.7 — 2026-10-18
 - **Correção: piscada ao trocar de jogo com ESQ/DIR no menu do arquivo.** A lista de jogos era
