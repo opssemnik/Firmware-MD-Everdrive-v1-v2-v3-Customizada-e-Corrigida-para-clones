@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.11'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.12'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -392,12 +392,12 @@ def main():
     patch(0xFF6FC2, bytes.fromhex('70264e714e714e712f00487900ff951f47f900ff7ca44e93'),  # dispositivo
           pea_l(syms['S_version']) + pea_l(0xC000) + bytes.fromhex('47f900ff7ca4') + jsr(0xFF90A4))
     patch(0xFF660E, bytes.fromhex('303900ffe30c6604424560f4'), jsr(syms['ramIdle']) + b'\x4e\x71' * 3)  # input wait
-    # Browser one row lower so the banner fits on rows 0-2: list y 2 -> 3, page row 23 -> 24,
-    # file name rows 24/25 -> 25/26 (bar on plane B and its clear), banner after each full clear
-    for ram, old, new in ((0xFF657E, '48780002', '48780003'), (0xFF6260, '48780018', '48780019'),
-                          (0xFF627A, '48780018', '48780019'), (0xFF62E0, '48780019', '4878001a'),
-                          (0xFF64E4, '48780018', '48780019'), (0xFF64FC, '48780017', '48780018'),
-                          (0xFF653A, '2ebc00000017', '2ebc00000018'), (0xFF6554, '48780017', '48780018')):
+    # Browser two rows lower: the banner on rows 0-2, a blank row, then the list on rows 4-24,
+    # page row 23 -> 25, file name rows 24/25 -> 26/27 (bar on plane B and its clear)
+    for ram, old, new in ((0xFF657E, '48780002', '48780004'), (0xFF6260, '48780018', '4878001a'),
+                          (0xFF627A, '48780018', '4878001a'), (0xFF62E0, '48780019', '4878001b'),
+                          (0xFF64E4, '48780018', '4878001a'), (0xFF64FC, '48780017', '48780019'),
+                          (0xFF653A, '2ebc00000017', '2ebc00000019'), (0xFF6554, '48780017', '48780019')):
         patch(ram, bytes.fromhex(old), bytes.fromhex(new))
     patch(0xFF64A8, bytes.fromhex('13fc000100ffe306'), jsr(syms['ramBrowserBanner']) + b'\x4e\x71')
     disp = syms['ramAbout'] - (0xFF7C0A + 2)

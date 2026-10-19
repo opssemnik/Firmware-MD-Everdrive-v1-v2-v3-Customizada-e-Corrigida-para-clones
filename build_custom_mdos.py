@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.11'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.12'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -1009,7 +1009,7 @@ def build_custom_mdos():
     ext.label('bi_ret')
     ext.emit(0x4e75)                                # rts
 
-    # 9d. previewEntry(d4 = cursor index): cover of that file at x=27, y=9 (rows 9-17)
+    # 9d. previewEntry(d4 = cursor index): cover of that file at x=27, y=10 (rows 10-18, middle of the list)
     ext.label('previewEntry')
     ext.emit(0x2279, 0x00ff, 0xc46c)                # movea.l $ffc46c.l, a1 (dir_hdr)
     ext.emit(0x3011)                                # move.w (a1), d0 (entry count)
@@ -1037,7 +1037,7 @@ def build_custom_mdos():
     ext.bne_w('pe_no')
     ext.emit(0x7c01)                                # moveq #1, d6 (cover drawn)
     ext.emit(0x7a1b)                                # moveq #27, d5
-    ext.emit(0x7c09)                                # moveq #9, d6
+    ext.emit(0x7c0a)                                # moveq #10, d6
     ext.bsr_w('drawArtTiles')
     ext.emit(0x4eb9, 0x00ff, 0x33b6)                # jsr $ff33b6.l (gRepaint: the page is double buffered)
     ext.label('pe_no')
@@ -1891,15 +1891,20 @@ def build_custom_mdos():
     struct.pack_into('>HIHhHH', rom, 0x499E, 0x4EB9, all_labels['menuLR'], 0x6700,
                      0xFF48F2 - (0xFF49A4 + 2), 0x4E71, 0x4E71)
 
-    # B4. Browser page counter ("Pág. x de y") moves from the top bar to row 24, just above the
-    #     file name bar (like the v1); the top bar keeps only the centred banner.
+    # B4. Browser layout: banner rows 0-2, a blank row, list rows 4-24 (was 3-23), page counter
+    #     ("Pág. x de y", was on the top bar) on row 25, file name bar rows 26-27 (was 25-26).
+    assert rom[0x0926:0x0928] == bytes.fromhex('7c03')
+    rom[0x0927] = 4                                  # first list row
     assert rom[0x09E2:0x09E6] == bytes.fromhex('48780001')
-    rom[0x09E5] = 24
-    # B5. No top bar on plane B any more: its two fills (y=1) repaint the bottom bar (y=25)
-    #     instead, so the banner (rows 0-2) sits on black like in the v1.
+    rom[0x09E5] = 25                                 # page counter row
+    for off, old in ((0x097E, 0x19), (0x09B2, 0x19), (0x0AC2, 0x19), (0x0AEE, 0x1A)):
+        assert rom[off:off + 4] == bytes.fromhex('487800%02x' % old), hex(off)
+        rom[off + 3] = old + 1                       # name bar fills and the two name lines
+    # B5. No top bar on plane B any more: its two fills (y=1) repaint the bottom bar instead,
+    #     so the banner (rows 0-2) sits on black like in the v1.
     for off in (0x0964, 0x099E):
         assert rom[off:off + 4] == bytes.fromhex('48780001'), hex(off)
-        rom[off + 3] = 0x19
+        rom[off + 3] = 0x1A
 
     # B6. gDrawBox: highlight bar for the last item of the recents list
     assert rom[0x47EC:0x47F2] == bytes.fromhex('2ebc0000c000')

@@ -5,6 +5,11 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.12 — 2026-10-18
+- **Espaço entre o banner e a lista de jogos**: uma linha em branco embaixo do banner. A lista
+  ocupa as linhas 4-24, a página fica na 25 e a barra com o nome do arquivo nas linhas 26-27.
+- A capa da pré-visualização desceu uma linha para continuar no meio da lista.
+
 ### 1.11 — 2026-10-18
 - **[ LIMPAR RECENTES ]** ganhou uma faixa vermelha atrás da linha (como o rodapé), na largura da tela.
 - `make_banner.py` reserva a cor 1 do banner para essa faixa: converta de novo o `BANNER.ART`.
@@ -79,6 +84,11 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.12 — 2026-10-18
+- **Espaço entre o banner e a lista de jogos**: uma linha em branco embaixo do banner. A lista
+  ocupa as linhas 4-24, a página fica na 25 e a barra com o nome do arquivo nas linhas 26-27.
+- A capa da pré-visualização desceu uma linha para continuar no meio da lista.
 
 ### 1.11 — 2026-10-18
 - **[ LIMPAR RECENTES ]** ganhou uma faixa vermelha atrás da linha, na largura da caixa do menu.

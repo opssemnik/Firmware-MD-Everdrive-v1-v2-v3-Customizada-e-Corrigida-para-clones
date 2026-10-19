@@ -62,7 +62,7 @@ static u8 gArtCache;                    /* 0 none, 1 = art of gArtHash is in VRA
 static u8 gBanner;                      /* 0 not tried yet, 1 no image, 2 /EDMD/BANNER.ART loaded */
 static u16 gBannerPal[14];
 #define BANNER_IMG_TILE 0x100           /* VRAM 0x2000: the 36x3 image banner */
-#define PREV_TOP 8                       /* cover box: rows 8..16 (middle of the list), cols 27..38 */
+#define PREV_TOP 10                      /* cover box: rows 10..18 (middle of the list), cols 27..38 */
 
 #define PREVIEW_DELAY 19                /* frames resting on a ROM before its cover loads (~0.32 s) */
 
@@ -223,7 +223,7 @@ ROMB_CODE static void drawBanner(u32 plane)
         osPrintAl(plane, S_banner, PAL2, 20, 1, ALIGN_CENTER);
 }
 
-/* browser full redraw (ramBrowserBanner): its list starts on row 3 to make room. Plane B,
+/* browser full redraw (ramBrowserBanner): its list starts on row 4 (a blank row under the banner). Plane B,
  * because entering a folder clears rows 0-24 of plane A only. */
 void browserBanner(void)
 {
