@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `1e7d659490497e1a215cf2d42f5aefc173bbdf25e8e38d2b3f390f5b16b4e813` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `243d9d1e1f767c58d0f29f7d5630226b6b9b1f8318538b0b5804804c92a359d9` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `add429efb35bb9826090d5afd41c50a11da0dc503ce0f8f09b169604c46d6aee` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `308645088291e3e02fad6d3fa669293389d6255109a40f04f2b39ad6b7aa2e21` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -24,7 +24,7 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 - **Banner "RETROGAMER POA"** no topo da lista de jogos e dos menus, e tela de créditos com o grupo;
   pode ser trocado por uma **imagem sua** (veja [Banner personalizado](#banner-personalizado))
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
-  nos recentes; o último item da lista, **Limpar recentes**, apaga a lista
+  nos recentes; o último item da lista, **[ LIMPAR RECENTES ]**, apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
 - **Capas (box art)** dos jogos, lidas de `/EDMD/ART` no cartão SD
 - **Info da ROM**: nome, console, copyright, serial, região, checksum e tamanho lidos do cabeçalho SEGA
@@ -64,7 +64,7 @@ Menu do jogo: **Carregar e jogar**, **Só carregar**, **Adicionar aos favoritos*
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.9**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.10**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -93,7 +93,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.9**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.10**.
 
 ---
 

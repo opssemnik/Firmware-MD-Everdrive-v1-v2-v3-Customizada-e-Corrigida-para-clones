@@ -5,6 +5,9 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.10 — 2026-10-18
+- O item **[ LIMPAR RECENTES ]** ficou destacado (maiúsculas entre colchetes) no fim da lista de recentes.
+
 ### 1.9 — 2026-10-18
 - **Banner com imagem**: `/EDMD/BANNER.ART` (288×24 px, até 14 cores, gerado com `make_banner.py`)
   aparece no topo dos menus, do menu do jogo e da lista de jogos. Sem o arquivo, fica o banner padrão.
@@ -72,6 +75,9 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.10 — 2026-10-18
+- O item **[ LIMPAR RECENTES ]** ficou destacado (maiúsculas entre colchetes) no fim da lista de recentes.
 
 ### 1.9 — 2026-10-18
 - **Banner com imagem**: o mesmo `/EDMD/BANNER.ART` da v1, no topo da lista de jogos, do menu do

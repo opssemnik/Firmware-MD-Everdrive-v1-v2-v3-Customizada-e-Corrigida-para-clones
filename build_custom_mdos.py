@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.9'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.10'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -1411,7 +1411,7 @@ def build_custom_mdos():
     ext.label('str_recent_title')
     ext.emit_str(b'Jogos Recentes')
     ext.label('str_clear_recent')
-    ext.emit_str(b'Limpar recentes')
+    ext.emit_str(b'[ LIMPAR RECENTES ]')
     ext.label('ir_exts')                            # isRomRec: 1 marker + lower-case extension
     for e in ('bin', 'md', 'gen', 'smd', 'sms', '32x'):
         ext.emit_l(int.from_bytes(b'\x01' + e.encode(), 'big'))
