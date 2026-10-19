@@ -17,7 +17,7 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 |---|---|
 | `OS-V38-PTBR.BIN` | firmware da v1 (gravar pelo próprio cartucho) |
 | `MDOS.BIN` | firmware da v3, já com o nome certo |
-| `SD-EverDrive-v1.zip` | pasta `EDMD` para a raiz do cartão SD: capas, banner e wallpaper |
+| `SD-EverDrive-v1.zip` | para a raiz do cartão SD: `OS-V38-PTBR.BIN` (firmware da v1) e a pasta `EDMD` com capas, banner e wallpaper |
 | `SD-EverDrive-v3.zip` | o mesmo, mais `EDMD/MDOS.BIN` (o firmware da v3) |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
@@ -58,7 +58,7 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 ## EverDrive-MD v1
 
 ### Instalação
-1. Copie `OS-V38-PTBR.BIN` para o cartão SD.
+1. Copie `OS-V38-PTBR.BIN` para o cartão SD (ou extraia o `SD-EverDrive-v1.zip` da release na raiz do cartão).
 2. No cartucho: **Ferramentas → gravar OS** (no OS original: *toolbox → update OS*), escolha o arquivo e confirme.
 3. O console reinicia sozinho com o novo OS.
 
