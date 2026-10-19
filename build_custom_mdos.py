@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.10'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.11'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -779,6 +779,27 @@ def build_custom_mdos():
     ext.emit(0x4cdf, 0x040c)                        # movem.l (a7)+, d2-d3/a2
     ext.emit(0x4e75)                                # rts
 
+    # 8c. menuBoxHook (jsr from gDrawBox at 0xFF47EC, replacing "move.l #$c000,(a7)"; plane B is
+    # still selected, d4 = x-1, d5 = y, d2 = w+2, d3 = rows+1, a2 = fill): in the recents list the
+    # last item ("[ LIMPAR RECENTES ]") gets a bar in palette 2 colour 1 (the banner crimson)
+    ext.label('menuBoxHook')
+    ext.emit(0x206f, 0x0018)                        # movea.l $18(a7), a0 (menuDraw's menu, saved a2)
+    ext.emit(0x0c90, 0, 0)                          # cmpi.l #str_recent_title, (a0)
+    ext.fixups.append((len(ext.buf) - 4, 'str_recent_title', 'abs32'))
+    ext.b_s(0x66, 'mbh_out')
+    ext.emit(0x0c03, 0x0005)                        # cmpi.b #5, d3 (one item: "Nenhum jogo recente")
+    ext.b_s(0x63, 'mbh_out')
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w (h)
+    ext.emit(0x2f02)                                # move.l d2, -(a7) (w)
+    ext.emit(0x2005, 0xd043, 0x5540, 0x2f00)        # y = d5 + d3 - 2 (last item row)
+    ext.emit(0x2f04)                                # move.l d4, -(a7) (x)
+    ext.emit(0x4878, 0x4001)                        # pea.l $4001.w (tile 1, palette 2)
+    ext.emit(0x4e92)                                # jsr (a2) (fill)
+    ext.emit(0x4fef, 0x0014)                        # lea.l $14(a7), a7
+    ext.label('mbh_out')
+    ext.emit(0x2f7c, 0x0000, 0xc000, 0x0004)        # move.l #$c000, 4(a7) (the replaced instruction)
+    ext.emit(0x4e75)                                # rts
+
     # 8a. clsTitle(a4 = fat_rec): blank screen, banner, game name centred on row 3 (max 38 chars)
     ext.label('clsTitle')
     ext.b_s(0x61, 'clsBanner')
@@ -1032,21 +1053,7 @@ def build_custom_mdos():
     ext.emit(0x4a00)                                # tst.b d0
     ext.bne_w('rfm_draw_menu')
 
-    ext.emit(0x4878, 0x000a)                        # pea.l $a.w (h = 10)
-    ext.emit(0x4878, 0x000c)                        # pea.l $c.w (w = 12)
-    ext.emit(0x4878, 0x0007)                        # pea.l $7.w (y = 7)
-    ext.emit(0x4878, 0x0019)                        # pea.l $19.w (x = 25)
-    ext.emit(0x4eb9, 0x00ff, 0x4778)                # jsr $ff4778.l (gDrawBox)
-    ext.emit(0x4fef, 0x0010)                        # lea.l $10(a7), a7
-
-    ext.emit(0x4878, 0x0003)                        # pea.l $3.w (Pal 3)
-    ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
-    ext.emit(0x4878, 0x0007)                        # pea.l $7.w (y = 7)
-    ext.emit(0x4878, 0x001c)                        # pea.l $1c.w (x = 28)
-    ext.pea_label('str_boxart_hdr')
-    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
-    ext.emit(0x4fef, 0x0010)                        # lea.l $10(a7), a7
-
+    # the cover sits straight on the screen (no "Boxart" box), like in the v1
     ext.emit(0x7a19)                                # moveq #25, d5
     ext.emit(0x7c08)                                # moveq #8, d6
     ext.bsr_w('drawArtTiles')
@@ -1326,8 +1333,6 @@ def build_custom_mdos():
     ext.label('str_art_prefix')
     ext.emit_str(b'/EDMD/ART/')
 
-    ext.label('str_boxart_hdr')
-    ext.emit_str(b'Boxart')
 
     # File & Main Menus
     ext.label('str_file_menu')
@@ -1895,6 +1900,10 @@ def build_custom_mdos():
     for off in (0x0964, 0x099E):
         assert rom[off:off + 4] == bytes.fromhex('48780001'), hex(off)
         rom[off + 3] = 0x19
+
+    # B6. gDrawBox: highlight bar for the last item of the recents list
+    assert rom[0x47EC:0x47F2] == bytes.fromhex('2ebc0000c000')
+    struct.pack_into('>HI', rom, 0x47EC, 0x4EB9, all_labels['menuBoxHook'])
 
     # C. Hook browser C-button Main Menu call (0x0FF0) -> call_mainMenu_from_browser
     patch_long(0x0FF2, 0x00FF50BC, all_labels['call_mainMenu_from_browser'])

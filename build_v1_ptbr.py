@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.10'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.11'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 

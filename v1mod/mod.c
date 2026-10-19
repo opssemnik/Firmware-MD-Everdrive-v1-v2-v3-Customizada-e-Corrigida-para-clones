@@ -247,9 +247,13 @@ static void clearWithBanner(void)
     gOverlay = o;
 }
 
+static u8 gHiRow;                       /* row of a highlighted menu item (0 = none) */
+
 static void overlayTitle(void)
 {
     center(gTitle, PAL2, 3);
+    if (gHiRow)                         /* bar in palette 2 colour 1, the banner crimson */
+        osFill(PLANE_B, PAL2 | 1, 0, gHiRow, 40, 1);
 }
 
 static u8 menu(const char *const *items, u32 n, u32 sel)
@@ -787,7 +791,10 @@ static void listMenu(int l)
             gItems[n] = S_clear_recent;     /* last item of the recents: empty the list */
         if (sel >= n)
             sel = n - 1;
+        if (!l)                             /* osMenu centres the items on row 12 */
+            gHiRow = 12 + n;                /* n games + "[ LIMPAR RECENTES ]": last row 11 + count */
         r = menu(gItems, n + !l, sel);
+        gHiRow = 0;
         gOverlay = 0;
         if (r & 0x40)
             return;

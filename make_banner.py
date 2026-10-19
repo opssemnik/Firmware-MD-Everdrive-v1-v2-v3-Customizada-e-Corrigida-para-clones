@@ -2,12 +2,14 @@
 PNG -> /EDMD/BANNER.ART: the banner shown on top of the menus and the game list (v1 and v3).
 
 Same layout as the box-art .ART files, so the OS loads it with the same code:
-  - 32 bytes: 16 big-endian CRAM words (entries 1..14 are used, 0 and 15 belong to the OS)
+  - 32 bytes: 16 big-endian CRAM words (entries 1..14 are used, 0 and 15 belong to the OS).
+    Entry 1 is always the menu highlight colour (crimson, the bar behind "[ LIMPAR RECENTES ]"),
+    so the image itself gets 13 colours (14 when it uses that crimson too).
   - 108 tiles 4bpp, row-major 36 x 3 (288 x 24 px)
   - zero padding to 3584 bytes (7 sectors)
 
-The image is cropped/resized to 288x24 when needed. Pixel art with up to 14 colours is kept
-exact; anything with more colours is reduced to 14 (no dithering).
+The image is cropped/resized to 288x24 when needed. Pixel art with up to 13 colours (plus that
+crimson) is kept exact; anything with more colours is reduced to 13 (no dithering).
 
     python make_banner.py banner.png                  # writes BANNER.ART next to the PNG
     python make_banner.py logo.png E:/EDMD/BANNER.ART
@@ -19,6 +21,7 @@ from pathlib import Path
 from PIL import Image
 
 W, H = 288, 24
+HIGHLIGHT = 0x00A       # palette 2 colour 1: menu highlight bar
 FILE_SIZE = 7 * 512
 
 
@@ -44,11 +47,12 @@ def convert(src):
         left, top = (im.width - W) // 2, (im.height - H) // 2
         im = im.crop((left, top, left + W, top + H))
     im = Image.frombytes('RGB', im.size, bytes(v for p in pixels(im) for v in rgb(md9(*p))))
-    colours = sorted({md9(*p) for p in pixels(im)})
-    if len(colours) > 14:
-        im = im.quantize(colors=14, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
-        colours = sorted({md9(*p) for p in pixels(im)})
-    index = {c: i + 1 for i, c in enumerate(colours)}
+    colours = sorted({md9(*p) for p in pixels(im)} - {HIGHLIGHT})
+    if len(colours) > 13:
+        im = im.quantize(colors=13, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
+        colours = sorted({md9(*p) for p in pixels(im)} - {HIGHLIGHT})
+    index = {c: i + 2 for i, c in enumerate(colours)}
+    index[HIGHLIGHT] = 1
     pal = [0] * 16
     for c, i in index.items():
         pal[i] = c

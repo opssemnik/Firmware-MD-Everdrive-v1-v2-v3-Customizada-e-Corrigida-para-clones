@@ -5,6 +5,10 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.11 — 2026-10-18
+- **[ LIMPAR RECENTES ]** ganhou uma faixa vermelha atrás da linha (como o rodapé), na largura da tela.
+- `make_banner.py` reserva a cor 1 do banner para essa faixa: converta de novo o `BANNER.ART`.
+
 ### 1.10 — 2026-10-18
 - O item **[ LIMPAR RECENTES ]** ficou destacado (maiúsculas entre colchetes) no fim da lista de recentes.
 
@@ -75,6 +79,11 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.11 — 2026-10-18
+- **[ LIMPAR RECENTES ]** ganhou uma faixa vermelha atrás da linha, na largura da caixa do menu.
+- Menu do arquivo: a capa fica direto na tela, sem a caixa "Boxart" (igual à v1); isso abriu o
+  espaço para a faixa.
 
 ### 1.10 — 2026-10-18
 - O item **[ LIMPAR RECENTES ]** ficou destacado (maiúsculas entre colchetes) no fim da lista de recentes.

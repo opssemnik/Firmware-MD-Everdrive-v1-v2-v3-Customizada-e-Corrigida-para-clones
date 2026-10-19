@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `add429efb35bb9826090d5afd41c50a11da0dc503ce0f8f09b169604c46d6aee` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `308645088291e3e02fad6d3fa669293389d6255109a40f04f2b39ad6b7aa2e21` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `5b24e0665d57362329538d8aa3405b9d27398cbc0005d6608cb891e5b821765d` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) | `MDOS.patched` (OS v3 já usado em clones) | `a30f34ee92a252ace5cb79e52abc8433d36f347b770dcd23b6aee1aa0abb2b33` |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -24,7 +24,7 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 - **Banner "RETROGAMER POA"** no topo da lista de jogos e dos menus, e tela de créditos com o grupo;
   pode ser trocado por uma **imagem sua** (veja [Banner personalizado](#banner-personalizado))
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
-  nos recentes; o último item da lista, **[ LIMPAR RECENTES ]**, apaga a lista
+  nos recentes; o último item da lista, **[ LIMPAR RECENTES ]** (com uma faixa vermelha atrás), apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
 - **Capas (box art)** dos jogos, lidas de `/EDMD/ART` no cartão SD
 - **Info da ROM**: nome, console, copyright, serial, região, checksum e tamanho lidos do cabeçalho SEGA
@@ -64,7 +64,7 @@ Menu do jogo: **Carregar e jogar**, **Só carregar**, **Adicionar aos favoritos*
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.10**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.11**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -93,7 +93,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.10**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.11**.
 
 ---
 
@@ -102,8 +102,9 @@ O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de ca
 O banner do topo (lista de jogos, menus, menu do jogo, Info da ROM) pode ser uma imagem colorida.
 Sem o arquivo, aparece o banner "RETROGAMER POA" padrão.
 
-- Tamanho: **288×24 px** (36×3 tiles), até **14 cores** (a paleta do Mega Drive tem 512 cores; o
-  conversor ajusta). Use um fundo opaco: a imagem é desenhada inteira.
+- Tamanho: **288×24 px** (36×3 tiles), até **13 cores** (a paleta do Mega Drive tem 512 cores; o
+  conversor ajusta). A cor 1 da paleta fica reservada para o vermelho da faixa de destaque dos menus.
+  Use um fundo opaco: a imagem é desenhada inteira.
 - Converta e copie para o cartão SD em **`/EDMD/BANNER.ART`** (vale para v1 e v3):
 
 ```
@@ -111,8 +112,9 @@ pip install pillow
 python make_banner.py meu_banner.png E:\EDMD\BANNER.ART
 ```
 
-Imagens de outro tamanho são redimensionadas e cortadas no centro. Pixel art com até 14 cores fica
-idêntica; imagens com mais cores são reduzidas para 14.
+Imagens de outro tamanho são redimensionadas e cortadas no centro. Pixel art com até 13 cores fica
+idêntica; imagens com mais cores são reduzidas para 13. `BANNER.ART` gerados antes da versão 1.11
+precisam ser convertidos de novo.
 
 ## Capas (box art)
 
