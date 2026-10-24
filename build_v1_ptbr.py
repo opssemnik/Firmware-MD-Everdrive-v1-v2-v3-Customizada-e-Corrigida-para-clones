@@ -26,7 +26,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.22'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.23'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     # /EDMD/V1EXT.BIN on the SD card
@@ -59,6 +59,8 @@ C_STRINGS = {
     'S_thm1': 'RG POA',
     'S_thm2': 'SEGA 16',
     'S_thm3': 'OUTRUN',
+    'S_thm_banner': 'DO BANNER',
+    'S_thm_locked': 'As cores vêm do BANNER.ART',
     'S_fm_load_start': 'Carregar e jogar',
     'S_fm_load_only': 'Só carregar',
     'S_fm_cheats': 'Jogar com cheats',

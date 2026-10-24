@@ -180,9 +180,12 @@ static const u16 themes[4][6] = {
     {0x202, 0xA0A, 0x606, 0xEE0, 0xA4A, 0xE4E},     /* OUTRUN */
 };
 
+static u16 gFileTheme[6];               /* colours that came with BANNER.ART ('TEMA' at 0xDA0) */
+static u8 gHasFileTheme;
+
 static void applyTheme(void)
 {
-    const u16 *c = themes[gTheme & 3];
+    const u16 *c = gHasFileTheme ? gFileTheme : themes[gTheme & 3];
     osSetColor(0, 0, c[0]);
     osSetColor(0, 1, c[1]);
     osSetColor(0, 2, c[2]);
@@ -201,12 +204,18 @@ static void applyTheme(void)
 
 static int readArtFile(u16 tile, u16 *pal, int abortable);
 
-/* /EDMD/BANNER.ART: same layout as a box-art file, 36x3 tiles (288x24 px) */
+/* /EDMD/BANNER.ART: same layout as a box-art file, 36x3 tiles (288x24 px), optionally followed by the
+ * theme colours (make_banner.py --cores): 'TEMA' + 6 words at file offset 0xDA0 (sector 6, + 0x1A0) */
 static void loadBanner(void)
 {
+    const u32 *t = (const u32 *)(gArtBuf + 0x1A0);
     if (osFind(S_banner_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0)
         || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0))
         return;
+    if (*t == 0x54454D41) {             /* readArtFile leaves the last sector in gArtBuf */
+        memcpy(gFileTheme, t + 1, sizeof(gFileTheme));
+        gHasFileTheme = 1;
+    }
     gBanner = 2;
     applyTheme();
 }
@@ -1277,6 +1286,10 @@ void myAbout(void)
 
 static void cycleTheme(void)
 {
+    if (gHasFileTheme) {                /* the banner's colours win over the themes */
+        info(S_thm_locked);
+        return;
+    }
     gTheme = (gTheme + 1) & 3;
     applyTheme();
     center(S_saving, PAL1, 23);
@@ -1289,10 +1302,12 @@ void myMainMenu(void)
     static const char *const thm[] = {S_thm0, S_thm1, S_thm2, S_thm3};
     static const char *const items[8] = {S_mm_play, S_mm_select, S_mm_recent, S_mm_fav, S_mm_random,
                                          S_mm_options, S_mm_cheats, S_mm_tools};
+    if (!gBanner)
+        loadImages();                   /* the banner may bring its own colours (theme item below) */
     for (;;) {
         u8 r;
         memcpy(gItems, items, sizeof(items));
-        scpy(scpy(gThemeItem, S_mm_theme), thm[gTheme & 3]);
+        scpy(scpy(gThemeItem, S_mm_theme), gHasFileTheme ? S_thm_banner : thm[gTheme & 3]);
         gItems[8] = gThemeItem;
 #ifdef DIAG
         gItems[9] = DS_menu;

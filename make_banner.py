@@ -6,13 +6,16 @@ Same layout as the box-art .ART files, so the OS loads it with the same code:
     Entry 1 is always the menu highlight colour (crimson, the bar behind "[ LIMPAR RECENTES ]"),
     so the image itself gets 13 colours (14 when it uses that crimson too).
   - 108 tiles 4bpp, row-major 36 x 3 (288 x 24 px)
-  - zero padding to 3584 bytes (7 sectors)
+  - zero padding to 3584 bytes (7 sectors); optionally, at offset 0xDA0, the theme colours that come
+    with the banner: 'TEMA' + 6 words (backdrop, menu bar, bar shadow, text, dim text, accent), used by
+    both firmwares instead of the chosen theme
 
 The image is cropped/resized to 288x24 when needed. Pixel art with up to 13 colours (plus that
 crimson) is kept exact; anything with more colours is reduced to 13 (no dithering).
 
     python make_banner.py banner.png                  # writes BANNER.ART next to the PNG
     python make_banner.py logo.png E:/EDMD/BANNER.ART
+    python make_banner.py logo.png E:/EDMD/BANNER.ART --cores 000,0A0,040,EEE,282,2E4   (0BGR hex)
 """
 import struct
 import sys
@@ -23,6 +26,7 @@ from PIL import Image
 W, H = 288, 24
 HIGHLIGHT = 0x00A       # palette 2 colour 1: menu highlight bar
 FILE_SIZE = 7 * 512
+THEME_OFF = 0xDA0       # after the 108 tiles
 
 
 def md9(r, g, b):
@@ -67,13 +71,22 @@ def convert(src):
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    cores = None
+    if '--cores' in args:
+        i = args.index('--cores')
+        cores = [int(c, 16) for c in args[i + 1].split(',')]
+        assert len(cores) == 6 and all(c & ~0xEEE == 0 for c in cores), 'six 0BGR colours, even digits 0-E'
+        del args[i:i + 2]
+    if not args:
         sys.exit(__doc__)
-    src = Path(sys.argv[1])
-    dst = Path(sys.argv[2]) if len(sys.argv) > 2 else src.with_name('BANNER.ART')
+    src = Path(args[0])
+    dst = Path(args[1]) if len(args) > 1 else src.with_name('BANNER.ART')
     data, n = convert(src)
+    if cores:
+        data = data[:THEME_OFF] + b'TEMA' + struct.pack('>6H', *cores) + data[THEME_OFF + 16:]
     dst.write_bytes(data)
-    print(f'{dst}: {n} colours, {len(data)} bytes')
+    print(f'{dst}: {n} colours, {len(data)} bytes' + (', theme colours' if cores else ''))
 
 
 if __name__ == '__main__':

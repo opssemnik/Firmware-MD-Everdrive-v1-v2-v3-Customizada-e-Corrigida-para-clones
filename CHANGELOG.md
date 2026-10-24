@@ -6,6 +6,11 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.23 — 2026-10-24
+- **Cores no banner:** um `BANNER.ART` pode trazer as cores do tema (fundo, faixa do menu, texto); com ele, essas cores valem no lugar do tema escolhido e o menu mostra **Tema: DO BANNER**. Novo `make_banner.py --cores`.
+- Primeiro tema pronto: **Maddrugamers** (`Tema-Maddrugamers.zip`), veja abaixo.
+- Só o `V1EXT.BIN` mudou: quem já gravou o OS da 1.22 só precisa trocar o `EDMD/V1EXT.BIN` no cartão.
+
 ### 1.22 — 2026-10-24
 - **Nova arquitetura: OS + extensão.** O `OS-V38-PTBR.BIN` agora é só um carregador; todo o mod (tradução, menus, capas, busca...) fica em `/EDMD/V1EXT.BIN`. No boot, o cartucho compara o arquivo do cartão com a cópia na flash (bloco `0x40000`) e regrava só quando mudou (~1 s, "Atualizando o mod PT-BR..."). **Grave este OS uma vez** (Ferramentas → gravar OS); as próximas versões poderão vir só como um `V1EXT.BIN` novo.
 - Sem a extensão (nunca instalada) roda o OS original, em inglês. Segurar **B** ao ligar também abre o OS original (para escapar de uma extensão com problema).
@@ -129,6 +134,12 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.23 — 2026-10-24
+- **Cores no banner:** um `BANNER.ART` pode trazer as cores do tema; com ele, essas cores valem no lugar do tema escolhido em Opções.
+- Primeiro tema pronto: **Maddrugamers** (`Tema-Maddrugamers.zip`).
+
+**Tema Maddrugamers** (arquivo separado, `Tema-Maddrugamers.zip`, para v1 e v3): banner, wallpaper e cores para o canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers) - preto, letreiro verde com sombra 3D e joysticks estilo arcade. Extraia na raiz do cartão SD (substitui `EDMD/BANNER.ART` e `EDMD/WALL.ART`).
 
 ### 1.22 — 2026-10-24
 - **Busca em todas as pastas** (C → *Buscar em Todas as Pastas*, o primeiro item do menu): por nome, num teclado na tela (várias palavras: todas precisam aparecer), ou pela primeira letra. Os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página; capa, menu do arquivo e START funcionam normalmente, e **B** volta para a pasta onde você estava.

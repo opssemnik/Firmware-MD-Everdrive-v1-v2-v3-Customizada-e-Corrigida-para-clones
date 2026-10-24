@@ -9,10 +9,10 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
 | EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
-| EverDrive-MD **v1** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 | `0cd8b887cfc90e09441496728fc8b1f28ba3514fa8eba97128265465f96f35ce` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `327d0b76584bb63640bc87845f4dd03b7b4541f366087f8c19e7914b0f82dba5` |
+| EverDrive-MD **v1** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 | `431e2d09b52910bd7a3b0786b808530cef987d3837c0344d96a98559972c2091` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `97425bd0c88394ebf680cfe2cd8daef2cb7c7a32bed190e04880ca5ceeebcf9f` |
 
-**Releases** ([página de Releases](../../releases)), 4 arquivos:
+**Releases** ([página de Releases](../../releases)): os firmwares e os temas:
 
 | Arquivo | O que é |
 |---|---|
@@ -20,6 +20,7 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | `SD-EverDrive-v1-sem-capas.zip` | **v1**, só o firmware e a extensão (`OS-V38-PTBR.BIN` + `EDMD/V1EXT.BIN`) |
 | `MDOS.BIN` | firmware da **v3**, já com o nome certo |
 | `SD-EverDrive-v3.zip` | **v3**, para a raiz do cartão SD: `EDMD/MDOS.BIN` (o firmware), capas, banner e wallpaper |
+| `Tema-Maddrugamers.zip` | tema do canal [Maddrugamers](https://www.youtube.com/@maddrugamers) (v1 e v3): `EDMD/BANNER.ART` + `EDMD/WALL.ART`, com as cores do tema dentro do banner - veja [Temas](#temas) |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -98,7 +99,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.22**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.23**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -136,7 +137,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.22**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.23**.
 
 ---
 
@@ -174,6 +175,29 @@ próprio (`sd/EDMD/WALL.ART`, de [`arte/gen_arte.py`](arte/gen_arte.py)).
 ```
 pip install pillow
 python make_wallpaper.py meu_wallpaper.png E:/EDMD/WALL.ART --dim 0.55
+```
+
+## Temas
+
+Um tema é um banner + wallpaper, e o banner pode trazer também as **cores** do tema (fundo, faixa do
+menu, texto). Basta copiar a pasta `EDMD` do zip do tema para a raiz do cartão (substitui o
+`BANNER.ART` e o `WALL.ART`); vale para v1 e v3. Com um banner que traz cores, elas valem no lugar do
+tema escolhido no cartucho (na v1 o item aparece como **Tema: DO BANNER**); para voltar aos temas do
+cartucho, use um banner sem cores (o do zip principal).
+
+| Tema | Arquivo na release | Fonte |
+|---|---|---|
+| **Maddrugamers**, para o canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers): preto, letreiro verde com sombra 3D e joysticks | `Tema-Maddrugamers.zip` | [`temas/maddrugamers`](temas/maddrugamers), gerado por [`arte/gen_maddruga.py`](arte/gen_maddruga.py) (arte própria) |
+
+| v1 | v3 |
+|---|---|
+| ![Maddrugamers na v1](temas/maddrugamers/previa_v1.png) | ![Maddrugamers na v3](temas/maddrugamers/previa_v3.png) |
+
+Para criar um tema com cores, use `--cores` no conversor do banner (cores do Mega Drive em hexadecimal
+`0BGR`, só dígitos pares: fundo, faixa do menu, sombra da faixa, texto, texto apagado, destaque):
+
+```
+python make_banner.py meu_banner.png E:/EDMD/BANNER.ART --cores 000,0A0,040,EEE,4C4,2E4
 ```
 
 ## Capas (box art)

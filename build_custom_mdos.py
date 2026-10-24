@@ -268,7 +268,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.22'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.23'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -1050,6 +1050,7 @@ def build_custom_mdos():
     ext.emit(0x4a00)                                # tst.b d0
     ext.b_s(0x66, 'pb_wall')
     ext.emit(0x5239, 0x00ff, 0xc5a4)                # addq.b #1, $ffc5a4.l (2 = image loaded)
+    ext.bsr_w('bannerTheme')
     ext.label('pb_wall')
     ext.bsr_w('loadWallpaper')                      # the wallpaper too (first browser page: card is up)
     ext.bsr_w('wallDraw')
@@ -1071,6 +1072,24 @@ def build_custom_mdos():
     ext.emit(0x7c00)                                # moveq #0, d6 (y=0)
     ext.bsr_w('drawTiles')
     ext.emit(0x4cdf, 0x007c)                        # movem.l (a7)+, d2-d6
+    ext.emit(0x4e75)                                # rts
+
+    # 9a3. bannerTheme: BANNER.ART (still in the buffer at 0xFFC800) may end with theme colours
+    # (make_banner.py --cores): 'TEMA' + 6 words at 0xDA0 (backdrop, bar, bar shadow, text, dim, accent).
+    # They replace all four themes (the table is in RAM), so the theme option has no effect then.
+    ext.label('bannerTheme')
+    ext.emit(0x0cb9, 0x5445, 0x4d41, 0x00ff, 0xd5a0)  # cmpi.l #'TEMA', $ffd5a0.l
+    ext.b_s(0x66, 'bt_ret')
+    ext.emit(0x41f9, 0x00ff, 0xd5a4)                # lea.l $ffd5a4.l, a0
+    ext.lea_label(1, 'theme_pal_table')
+    ext.emit(0x7203)                                # moveq #3, d1
+    ext.label('bt_loop')
+    ext.emit(0x22d0)                                # move.l (a0), (a1)+ (backdrop, bar)
+    ext.emit(0x32e8, 0x0004)                        # move.w 4(a0), (a1)+ (bar shadow)
+    ext.emit(0x32e8, 0x000a)                        # move.w 10(a0), (a1)+ (accent: selected text)
+    ext.dbra(1, 'bt_loop')
+    ext.bra_w('applyTheme')
+    ext.label('bt_ret')
     ext.emit(0x4e75)                                # rts
 
     # 9b. drawArtTiles lives in blkA (old English file-menu strings, see below)
