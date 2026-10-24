@@ -331,6 +331,7 @@ static void overlayTitle(void);
 static u32 filterApply(char letter);
 static u8 menu(const char *const *items, u32 n, u32 sel);
 static void info(const char *msg);
+static u32 extSearch(void);
 
 /* browser, C (ramBrowserC): pick a letter; only the files starting with it stay in the list (folders
  * always do). The browser's directory table is reordered in place and its count shortened; another
@@ -338,7 +339,7 @@ static void info(const char *msg);
  * the top), 0 when cancelled; the browser redraws the page either way. */
 ROMC_CODE u32 browserFilter(void)
 {
-    static const char *const groups[] = {S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num, S_flt_all};
+    static const char *const groups[] = {S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num, S_flt_all, S_flt_search};
     static char letters[8][2];
     const char *items[8];
     char letter = 0;
@@ -348,7 +349,7 @@ ROMC_CODE u32 browserFilter(void)
 
     gTitle = S_flt_title;
     gOverlay = overlayTitle;
-    r = menu(groups, 6, 0);
+    r = menu(groups, 7, 0);
     if (r < 4) {
         n = r == 3 ? 8 : 6;
         for (i = 0; i < n; i++) {
@@ -362,7 +363,9 @@ ROMC_CODE u32 browserFilter(void)
         letter = '#';
     }
     gOverlay = 0;
-    if (!(r & 0x40))                    /* B: back to the list as it was */
+    if (r == 6)                         /* every folder: the search lives in the flash extension */
+        changed = extSearch();
+    else if (!(r & 0x40))               /* B: back to the list as it was */
         changed = filterApply(letter);
     osClear();                          /* the browser then redraws only the list and the footer */
     drawWallpaper();
@@ -1315,6 +1318,53 @@ u32 fileMenuFromBrowser(u32 idx)
     return idx;
 }
 
+/* ---------------------------------------------------------------- flash extension (ext.c) */
+
+/* Code that does not fit in the OS image lives in flash block 0x40000 (never used by the OS), copied
+ * there from /EDMD/V1EXT.BIN. The installer runs from RAM, in the stock main menu's place (0xFF528E,
+ * replaced by myMainMenu): the OS copies it there at boot with the rest of the image. Its strings take
+ * the stock main menu's ones (.deadstr, 0xFF96C8). */
+#define DEAD_CODE __attribute__((section(".dead.text"), noinline))
+#define EXT_ADDR 0x40000
+#define EXT_MAGIC 0x50544258            /* 'PTBX', then the build id */
+
+u32 srchMain(void);
+
+__attribute__((noinline)) static int extHdrOk(const u32 *h)
+{
+    return h[0] == EXT_MAGIC && h[1] == BUILD_ID;
+}
+
+/* /EDMD/V1EXT.BIN of this build -> flash 0x40000. Its first sector (the header) is written last, so a cut
+ * install never looks complete. */
+DEAD_CODE static int extInstall(void)
+{
+    u32 keep = DIR_CLUSTER(), n, s;
+
+    if (!osFind(S_ext_path, &gTmp, 0) && !osOpen(&gTmp, 0) && !osRead(gSector0, 1) && extHdrOk((u32 *)gSector0)) {
+        n = (gTmp.size + 511) >> 9;
+        osPrint(PLANE_A, S_ext_install, PAL2, 1, 26);
+        osFlashErase(EXT_ADDR, 0x80, 1);
+        for (s = 1; s < n && !osRead(gArtBuf, 1); s++)
+            osFlashWrite(gArtBuf, EXT_ADDR + (s << 9), 1);
+        if (s == n)
+            osFlashWrite(gSector0, EXT_ADDR, 1);
+    }
+    DIR_CLUSTER() = keep;
+    if (extHdrOk((const u32 *)EXT_ADDR))
+        return 1;
+    info(S_ext_missing);
+    return 0;
+}
+
+/* browser C menu, "Buscar em todas as pastas" */
+static u32 extSearch(void)
+{
+    if (!extHdrOk((const u32 *)EXT_ADDR) && !extInstall())
+        return 0;
+    return srchMain();
+}
+
 /* ---------------------------------------------------------------- about / theme / main */
 
 void myAbout(void)
@@ -1404,3 +1454,5 @@ void myInit(void)
     uploadExtraTiles();
     applyTheme();
 }
+
+#include "ext.c"

@@ -11,6 +11,9 @@ MEMORY
     ROMA (rx) : ORIGIN = 0x1E400, LENGTH = 0x1BF8
     ROMD (rx) : ORIGIN = 0x1CC20, LENGTH = 0x0F00     /* POA logo rows 2-4: diagnostics build only */
     RAM  (rw) : ORIGIN = 0xFFE400, LENGTH = 0x0C00
+    DEAD (rx) : ORIGIN = 0xFF528E, LENGTH = 0x0146    /* stock main menu, replaced: RAM code (extInstall) */
+    DSTR (r)  : ORIGIN = 0xFF96C8, LENGTH = 0x0046    /* stock main menu strings, unused: RAM strings */
+    EXT  (rx) : ORIGIN = 0x40000, LENGTH = 0x10000    /* flash extension, /EDMD/V1EXT.BIN */
 }
 
 SECTIONS
@@ -19,6 +22,9 @@ SECTIONS
     .strb : { *(.strb) *(.strb.text) } > ROMB
     .diag : { *(.diag) *(.diagro) } > ROMD
     .strc : { *(.strc) *(.strc.text) } > ROMC
+    .dead : { *(.dead.text) } > DEAD
+    .deadstr : { *(.deadstr) } > DSTR
+    .ext : { KEEP(*(.exthdr)) *(.ext.text) *(.ext.ro) } > EXT
     .ramstub : { *(.ramstub) } > RAM AT > ROMA
     .data : { *(.data .data.*) } > RAM AT > ROMA
     .bss (NOLOAD) : { bssStart = .; *(.bss .bss.* COMMON) bssEnd = .; } > RAM

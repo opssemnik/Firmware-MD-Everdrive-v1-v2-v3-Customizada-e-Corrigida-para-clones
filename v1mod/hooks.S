@@ -19,12 +19,6 @@
 
     .section .ramstub, "ax"
 
-    .globl  ramMain
-ramMain:                        /* main menu (was jsr $ff528e) */
-    CHECK   1f
-    jmp     myMainMenu
-1:  jmp     0xFF528E
-
     .globl  ramMenuClear
 ramMenuClear:                   /* osMenu screen clear (was jsr $ff7fb2) */
     CHECK   1f

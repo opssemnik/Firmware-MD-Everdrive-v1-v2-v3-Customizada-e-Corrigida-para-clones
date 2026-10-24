@@ -14,13 +14,13 @@ mkdir -p build
 CFLAGS="-m68000 -Os -ffreestanding -fno-pic -fno-pie -fomit-frame-pointer -fno-asynchronous-unwind-tables \
  -fno-tree-loop-distribute-patterns -fno-common -Wall -Wno-pointer-sign -Werror"
 
-$CC $CFLAGS $DEFS -I. -Ibuild -c mod.c -o build/mod.o
+$CC $CFLAGS $DEFS -DBUILD_ID=$1 -I. -Ibuild -c mod.c -o build/mod.o
 $CC $CFLAGS $DEFS -I. -Ibuild -c build/gen.c -o build/gen.o
 $CC -m68000 $DEFS -DBUILD_ID=$1 -c hooks.S -o build/hooks.o
 $CC -m68000 -nostdlib -no-pie -static -T link.ld -Wl,-Map=build/mod.map -Wl,--no-warn-rwx-segments \
     build/mod.o build/gen.o build/hooks.o -o build/mod.elf
 
-for s in text strb strc ramstub data diag; do
+for s in text strb strc ramstub data diag dead deadstr ext; do
     ${P}objcopy -O binary -j .$s build/mod.elf build/$s.bin
 done
 ${P}nm -n build/mod.elf > build/mod.sym

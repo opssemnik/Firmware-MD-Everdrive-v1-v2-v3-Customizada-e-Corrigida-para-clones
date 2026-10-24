@@ -21,13 +21,18 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.20'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.21'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
+EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     # /EDMD/V1EXT.BIN on the SD card
 
 RAM = 0xFF0000          # RAM address of file offset 0
 CART = 0x10000          # cart address of file offset 0
 CODE_START, CODE_END = 0x10DC, 0x93DC   # RAM-resident code (font data precedes it)
+DEAD = (0xFF528E, 0xFF53D4)             # stock main menu (replaced by myMainMenu): the .dead section
+DEADSTR = (0xFF96C8, 0xFF970E)          # its item + error strings: .deadstr
+DEAD_STRINGS = ('S_ext_path', 'S_ext_missing', 'S_ext_install')
+EXT_ADDR, EXT_SIZE = 0x40000, 0x10000   # flash extension block
 SIG_OFF = 0xFFF8
 
 GLYPHS = 'áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ'
@@ -53,8 +58,12 @@ C_STRINGS = {
     'S_fm_load_start': 'Carregar e jogar',
     'S_fm_load_only': 'Só carregar',
     'S_fm_cheats': 'Jogar com cheats',
-    'S_help': 'A: menu   START: jogar   C: filtrar',
-    'S_flt_title': 'Filtrar por letra',
+    'S_help': 'A: menu  START: jogar  C: filtro/busca',
+    'S_flt_title': 'Filtrar ou buscar',
+    'S_flt_search': 'Buscar em todas as pastas',
+    'S_ext_path': '/EDMD/V1EXT.BIN',
+    'S_ext_missing': 'Falta /EDMD/V1EXT.BIN',
+    'S_ext_install': 'Instalando a extensão...',
     'S_flt_af': 'A - F',
     'S_flt_gl': 'G - L',
     'S_flt_mr': 'M - R',
@@ -111,6 +120,22 @@ C_STRINGS = {
     'S_ab_dist': 'distribuído por:',
 }
 
+# strings of the flash extension (ext.c, /EDMD/V1EXT.BIN)
+EXT_STRINGS = {
+    'SX_title': 'Buscar em todas as pastas',
+    'SX_by_name': 'Por nome (digitar)',
+    'SX_kb_title': 'Buscar por nome',
+    'SX_kb_help': 'A: digitar  B: apagar  START: buscar',
+    'SX_space': 'ESPAÇO',
+    'SX_del': 'APAGAR',
+    'SX_ok': 'BUSCAR',
+    'SX_searching': 'Buscando em todas as pastas...',
+    'SX_stop': 'B: parar',
+    'SX_folders': 'Pastas lidas: ',
+    'SX_found': 'Encontrados:  ',
+    'SX_full': 'Muitos resultados: só os 512 primeiros',
+}
+
 # ---------------------------------------------------------------- stock strings moved to flash
 OS_REPOINT = {
     0xFF941C: 'Erro do OS',
@@ -136,8 +161,6 @@ OS_REPOINT = {
     0xFF969F: 'copiando SRAM p/ flash...',
     0xFF96B5: 'pronto!',
     0xFF96BB: 'MegaKey software...',
-    0xFF96F5: 'erro na seleção: ',
-    0xFF9701: 'erro na gravação: ',
     0xFF973A: 'Reset total:',
     0xFF9746: 'Modo Genny3:',
     0xFF9753: 'Backup auto SRAM:',
@@ -303,11 +326,14 @@ def gen_sources(glyphs, banner):
          f'const unsigned char glyph1bpp[] __attribute__((section(".strb"))) = {{{c_bytes(sum(glyphs, []))}}};',
          f'const unsigned char banner2bpp[] __attribute__((section(".strb"))) = {{{c_bytes(banner)}}};']
     for name, data in sorted(strings.items(), key=lambda kv: -len(kv[1])):
-        sec = next((s for s, left in room.items() if left >= len(data) + 1), '.rodata.gen')
+        sec = '.deadstr' if name in DEAD_STRINGS else             next((s for s, left in room.items() if left >= len(data) + 1), '.rodata.gen')
         if sec in room:
             room[sec] -= len(data) + 1
         h.append(f'extern const char {name}[];')
         c.append(f'const char {name}[] __attribute__((section("{sec}"))) = {{{c_bytes(data)}}};')
+    for name, t in EXT_STRINGS.items():
+        h.append(f'extern const char {name}[];')
+        c.append(f'const char {name}[] __attribute__((section(".ext.ro"))) = {{{c_bytes(enc(t) + bytes(1))}}};')
     h.append('#endif')
     BUILD.mkdir(exist_ok=True)
     (BUILD / 'gen.h').write_text('\n'.join(h) + '\n')
@@ -367,17 +393,37 @@ def main():
     syms, secs = compile_mod(build_id)
     assert secs.get('.data', (0, 0, 0))[1] == 0, '.data must be empty (nothing copies it)'
     placed = []
-    for name in ('.text', '.ramstub', '.strb', '.strc', '.diag'):
+    for name in ('.text', '.ramstub', '.strb', '.strc', '.diag', '.dead', '.deadstr'):
         if name not in secs or not secs[name][1]:
             assert name == '.diag' and not DIAG, f'missing section {name}'
             continue
         lma, size, vma = secs[name]
         data = (BUILD / f'{name[1:]}.bin').read_bytes()
         assert len(data) == size
-        off = lma - CART
+        if name in ('.dead', '.deadstr'):   # RAM code/strings inside the OS image (copied to RAM at boot)
+            lo, hi = DEAD if name == '.dead' else DEADSTR
+            assert lo <= lma and lma + size <= hi
+            off = lma - RAM
+        else:
+            off = lma - CART
         assert 0 <= off and off + size <= SIG_OFF
         rom[off:off + size] = data
         placed.append((name, lma, size))
+    # the extension: header 'PTBX' + build id, padded to whole sectors (extInstall copies sectors)
+    ext = (BUILD / 'ext.bin').read_bytes()
+    assert secs['.ext'][0] == EXT_ADDR and len(ext) == secs['.ext'][1] <= EXT_SIZE
+    assert ext[:8] == b'PTBX' + struct.pack('>I', build_id)
+    ext += b'\xff' * (-len(ext) % 512)
+    # ext.c code must stay in the extension (the base enters it only through extSearch) and nothing
+    # of the base may land there
+    ext_src = (MOD / 'ext.c').read_text()
+    for n, a in syms.items():
+        in_ext = EXT_ADDR <= a < EXT_ADDR + EXT_SIZE
+        base_name = n.split('.')[0]
+        if re.search(r'EXT_CODE[^(]*\b' + re.escape(base_name) + r'\(', ext_src):
+            assert in_ext, f'{n} (ext.c) is outside the extension'
+        elif in_ext:
+            assert n.startswith('SX_') or base_name in re.findall(r'\w+', ext_src), f'unexpected symbol in the extension: {n}'
     rom[SIG_OFF:SIG_OFF + 8] = b'PTBR' + struct.pack('>I', build_id)
     lst = (BUILD / 'mod.lst').read_text()
     bad = re.findall(r'\b(extbl|mulsl|mulul|divsl|divul|divsll|divull|bf[a-z]+|cas2?|chk2|cmp2|rtd|pack|unpk)\b', lst)
@@ -395,7 +441,7 @@ def main():
 
     jsr = lambda t: struct.pack('>HI', 0x4EB9, t)
     patch(0xFF1220, jsr(0xFF1C58), jsr(syms['myInit']))                 # boot init
-    patch(0xFF1350, jsr(0xFF528E), jsr(syms['ramMain']))                # main menu
+    patch(0xFF1350, jsr(0xFF528E), jsr(syms['myMainMenu']))             # main menu (the stock one becomes .dead)
     patch(0xFF594A, jsr(0xFF7FB2), jsr(syms['ramMenuClear']))           # menu clear -> banner/overlay
     patch(0xFF5C7E, bytes.fromhex('4feffe002f02'), struct.pack('>HI', 0x4EF9, syms['ramSave']))
     patch(0xFF6640, bytes.fromhex('4a68000a670000d0'), jsr(syms['ramAHook']) + b'\x4e\x71')
@@ -450,7 +496,7 @@ def main():
         new = syms[f'O_{addr:06X}']
         hits = 0
         for i in insns:
-            if i.address in NOT_STRING_REFS:
+            if i.address in NOT_STRING_REFS or DEAD[0] <= i.address < DEAD[1]:
                 continue
             for k in range(2, i.size - 3, 2):
                 if struct.unpack_from('>I', i.bytes, k)[0] == addr:
@@ -472,6 +518,7 @@ def main():
     assert not any(rom[0xE2C0:0xE400])                      # OS variables at 0xFFE302.. start zeroed
     diff_code = sum(1 for i in range(CODE_END) if rom[i] != stock[i])
     OUT.write_bytes(rom)
+    EXT_OUT.write_bytes(ext)
 
     print(f'\nBuilt {OUT.name} ({len(rom)} bytes), build id {build_id:08X}')
     for name, lma, size in placed:
@@ -479,6 +526,8 @@ def main():
     print(f'  free: ROMA {0x1FFF8 - max(secs[s][0] + secs[s][1] for s in (".text", ".ramstub"))} B, '
           f'ROMB {0x1DB20 + 0x7A0 - (secs[".strb"][0] + secs[".strb"][1])} B, '
           f'ROMC {0x1C220 + 0xA00 - (secs[".strc"][0] + secs[".strc"][1])} B')
+    print(f'  {EXT_OUT.name}: {len(ext)} bytes ({secs[".ext"][1]} used of {EXT_SIZE}), '
+          f'.dead {DEAD[1] - DEAD[0] - secs[".dead"][1]} B free')
     bss = syms['bssEnd'] - syms['bssStart']
     print(f'  RAM: stubs {secs[".ramstub"][2]:06X} ({secs[".ramstub"][1]} B), bss {syms["bssStart"]:06X}..{syms["bssEnd"]:06X} ({bss} B)')
     print(f'  {nrefs} string references repointed, {len(OS_INPLACE)} strings translated in place, '

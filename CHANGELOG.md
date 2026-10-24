@@ -6,6 +6,11 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.21 — 2026-10-24
+- **Busca em todas as pastas**: botão **C** na lista de jogos → *Buscar em todas as pastas*. Procura no cartão inteiro (menos `EDMD`) **por letra** ou **por nome**, num teclado na tela (A digita, B apaga, START busca; várias palavras precisam aparecer todas, em qualquer ordem). Os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página: capa, menu do jogo e START funcionam como sempre. B ou "Todos" voltam às pastas; B durante a busca para.
+- A busca fica numa **extensão**, `/EDMD/V1EXT.BIN` (vem no `SD-EverDrive-v1.zip`): na primeira busca ela é copiada para um bloco livre da flash do cartucho (`0x40000`, ~1 s). Sem o arquivo aparece "Falta /EDMD/V1EXT.BIN" e o resto funciona normalmente.
+- Barra de ajuda: `A: menu  START: jogar  C: filtro/busca`.
+
 ### 1.20 — 2026-10-19
 - **Barra de ajuda** logo abaixo do banner na lista de jogos: `A: menu   START: jogar   C: filtrar`.
 
@@ -117,6 +122,9 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.21 — 2026-10-24
+- Sem mudanças de código; só a versão (mesma numeração da v1). A busca em todas as pastas chega à v3 na próxima versão.
 
 ### 1.20 — 2026-10-19
 - **Barra de ajuda** logo abaixo do banner na lista de jogos: `A: arquivo  START: repetir  C: filtro` (o C abre o menu principal, onde fica o Filtrar por Letra).
