@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.15'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.16'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -560,9 +560,14 @@ def build_custom_mdos():
     ext.emit(0x30bc, 0x855e)                        # move.w #$855e, (a0) (sprites 0xBC00)
     ext.emit(0x30bc, 0x8d2e)                        # move.w #$8d2e, (a0) (H scroll 0xB800)
     ext.emit(0x20bc, 0x7800, 0x0002)                # move.l #$78000002, (a0) (VRAM write 0xB800)
+    ext.emit(0x30bc, 0x9100)                        # move.w #$9100, (a0) (window off: H position 0
+    ext.emit(0x30bc, 0x9200)                        # move.w #$9200, (a0)                V position 0)
     ext.emit(0x303c, 0x0203)                        # move.w #$203, d0 (0xB800..0xBC07)
+    ext.emit(0x7200)                                # moveq #0, d1
     ext.label('bi_hs_clr')
-    ext.emit(0x4279, 0x00c0, 0x0000)                # clr.w $c00000.l
+    # never CLR/TST/NOT... a VDP port: the 68000 reads it first, and reading the data port while
+    # the VDP is set up for writing hangs the real console (the black screen of 1.14/1.15)
+    ext.emit(0x3141, 0xfffc)                        # move.w d1, -4(a0) ($c00000)
     ext.dbra(0, 'bi_hs_clr')
     ext.emit(0x46df)                                # move.w (a7)+, sr
     ext.emit(0x4cdf, 0x0c3c)                        # movem.l (a7)+, d2-d5/a2-a3
@@ -2288,6 +2293,20 @@ def build_custom_mdos():
         )
 
     assert b'\x00\xa1\x30\x50' not in rom[:0x8000], "Unexpected hardware register access!"
+    # Read-modify-write instructions (clr/tst/not/neg/negx with an absolute long address) on the VDP
+    # ports $C00000-$C00007 hang the real console; the emulator doesn't notice, so refuse them.
+    rmw = {0x4239, 0x4279, 0x42B9, 0x4A39, 0x4A79, 0x4AB9, 0x4639, 0x4679, 0x46B9,
+           0x4439, 0x4479, 0x44B9, 0x4039, 0x4079, 0x40B9}
+    for blk_name, blk_buf, blk_base in [('ext', bytes(ext.buf[:code_end_off]), 0xFF6E48),
+                                        ('overlay', bytes(ovl.buf[:ovl_code_end]), 0xFFC800),
+                                        ('blk1', bytes(blk1.buf), 0xFF0B92), ('blk2', bytes(blk2.buf), 0xFF4F74),
+                                        ('blk3', bytes(blk3.buf), 0xFF50BC), ('opt', bytes(opt_asm.buf), 0xFF49B6),
+                                        ('blkA', bytes(blkA.buf), 0xFF6854), ('blkB', bytes(blkB.buf), 0xFF6B08)]:
+        for insn in md.disasm(blk_buf, blk_base):
+            op = int.from_bytes(insn.bytes[:2], 'big')
+            if op in rmw and len(insn.bytes) == 6:
+                addr = int.from_bytes(insn.bytes[2:6], 'big')
+                assert not 0xC00000 <= addr <= 0xC00007, f"{blk_name} {insn.address:06X}: {insn.mnemonic} on VDP port"
 
     out_path = 'mega-genesis/MDOS.ptbr.BIN'
     with open(out_path, 'wb') as f:

@@ -155,6 +155,8 @@ class Machine:
         if off in (8, 9):
             return (self.mu.reg_read(UC_M68K_REG_PC) * 7 + self.vbl) & 0xFFFF
         if off in (0, 1, 2, 3):
+            if self.vcode & 1:          # reading the data port while set up for a write hangs the real 68000
+                self.log(f'!! VDP data port read in write mode (code {self.vcode:02X}) at pc={self.mu.reg_read(UC_M68K_REG_PC):06X}')
             v = struct.unpack_from('>H', self.vram, self.vaddr & 0xFFFE)[0]
             self.vaddr = (self.vaddr + self.regs[15]) & 0xFFFF
             return v

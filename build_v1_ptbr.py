@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.15'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.16'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -373,6 +373,10 @@ def main():
     lst = (BUILD / 'mod.lst').read_text()
     bad = re.findall(r'\b(extbl|mulsl|mulul|divsl|divul|divsll|divull|bf[a-z]+|cas2?|chk2|cmp2|rtd|pack|unpk)\b', lst)
     assert not bad, f'non-68000 instructions emitted: {set(bad)}'
+    # read-modify-write instructions on the VDP ports read them first: a data port read while the
+    # VDP is set up for writing hangs the real console (the v3 1.14/1.15 black screen)
+    rmw = re.findall(r'\b(?:clr|tst|not|negx?|bset|bclr|bchg|tas|addq|subq|or|and|eor)[bwl]?\b[^\n]*\bc0000[0-7]\b', lst)
+    assert not rmw, f'read-modify-write on a VDP port: {rmw}'
 
     # 4. hooks into the RAM-resident OS
     def patch(ram, old, new):
