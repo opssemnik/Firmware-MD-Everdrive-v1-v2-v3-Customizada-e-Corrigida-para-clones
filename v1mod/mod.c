@@ -59,6 +59,7 @@ static u32 gArtHash;
 static u8 gArtCache;                    /* 0 none, 1 = art of gArtHash is in VRAM, 2 = it has no art */
 /* code that does not fit in ROMA goes with the strings in the blank POA logo rows (ROMB) */
 #define ROMB_CODE __attribute__((section(".strb.text")))
+#define ROMC_CODE __attribute__((section(".strc.text")))
 
 static u8 gBanner;                      /* 0 not tried yet, 1 no image, 2 /EDMD/BANNER.ART loaded */
 static u16 gBannerPal[14];
@@ -244,7 +245,7 @@ ROMB_CODE static void loadWallpaper(void)
 }
 
 /* first banner/wallpaper use: mount the card (once) and load both images */
-ROMB_CODE static void loadImages(void)
+ROMB_CODE __attribute__((noinline)) static void loadImagesOnce(void)
 {
     gBanner = 1;
     if (!FAT_READY) {
@@ -254,6 +255,13 @@ ROMB_CODE static void loadImages(void)
     }
     loadBanner();
     loadWallpaper();
+}
+
+static void loadImages(void)
+{
+    u32 keep = DIR_CLUSTER();
+    loadImagesOnce();
+    DIR_CLUSTER() = keep;
 }
 
 /* the wallpaper on plane B: its names are copied from the VRAM copy, row by row */
@@ -292,10 +300,104 @@ ROMB_CODE static void drawBanner(u32 plane)
 
 /* browser full redraw (ramBrowserBanner): its list starts on row 4 (a blank row under the banner). Plane B,
  * because entering a folder clears rows 0-24 of plane A only. */
+static char gFilter;                    /* browser letter filter: 'A'..'Z', '#' (others), 0 = none */
+static u16 gFilterCount;                /* the filtered folder, to notice when the browser reloads it */
+static u32 gFilterCluster;
+
+/* "[M]" next to the page counter while a filter is on (blank otherwise); ramPagePal calls it before
+ * every page counter print */
+ROMC_CODE void drawFilterTag(void)
+{
+    char t[4] = {' ', ' ', ' ', 0};
+    if (gFilter && (DIR_CLUSTER() != gFilterCluster || DIR_COUNT() != gFilterCount))
+        gFilter = 0;                    /* another folder, or this one read again: unfiltered */
+    if (gFilter) {
+        t[0] = '[';
+        t[1] = gFilter;
+        t[2] = ']';
+    }
+    osPrint(PLANE_A, t, PAL2, 18, 26);
+}
+
 void browserBanner(void)
 {
     drawWallpaper();
     drawBanner(PLANE_B);
+}
+
+static void overlayTitle(void);
+static u32 filterApply(char letter);
+static u8 menu(const char *const *items, u32 n, u32 sel);
+static void info(const char *msg);
+
+/* browser, C (ramBrowserC): pick a letter; only the files starting with it stay in the list (folders
+ * always do). The browser's directory table is reordered in place and its count shortened; another
+ * letter or "Todos" reads the folder again first. Returns 1 when the list changed (the cursor goes to
+ * the top), 0 when cancelled; the browser redraws the page either way. */
+ROMC_CODE u32 browserFilter(void)
+{
+    static const char *const groups[] = {S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num, S_flt_all};
+    static char letters[8][2];
+    const char *items[8];
+    char letter = 0;
+    u32 changed = 0;
+    u8 r;
+    int n, i;
+
+    gTitle = S_flt_title;
+    gOverlay = overlayTitle;
+    r = menu(groups, 6, 0);
+    if (r < 4) {
+        n = r == 3 ? 8 : 6;
+        for (i = 0; i < n; i++) {
+            letters[i][0] = 'A' + r * 6 + i;
+            items[i] = letters[i];
+        }
+        letter = 'A' + r * 6;
+        r = menu(items, n, 0);
+        letter += r;
+    } else if (r == 4) {
+        letter = '#';
+    }
+    gOverlay = 0;
+    if (!(r & 0x40))                    /* B: back to the list as it was */
+        changed = filterApply(letter);
+    osClear();                          /* the browser then redraws only the list and the footer */
+    drawWallpaper();
+    drawBanner(PLANE_B);
+    PAGE_CACHE = 0xFFFF;
+    return changed;
+}
+
+/* the whole folder again, then (unless "Todos") only the files starting with letter */
+__attribute__((noinline)) static u32 filterApply(char letter)
+{
+    int n, i, j;
+
+    if (osOpenDir(DIR_CLUSTER()))
+        return 1;
+    gFilter = letter;
+    if (!letter)
+        return 1;
+    n = DIR_COUNT();
+    for (i = j = 0; i < n; i++) {       /* the table keeps the first letters of each name: no SD reads */
+        DirEnt *e = DIR_ENT(i);
+        char c = e->key[0];
+        if (c >= 'a' && c <= 'z')
+            c -= 32;
+        if (e->isdir || (letter == '#' ? c < 'A' || c > 'Z' : c == letter))
+            DIR_ENT(j++) = e;
+    }
+    if (!j) {                           /* nothing with that letter: say so, keep the whole folder */
+        gFilter = 0;
+        osOpenDir(DIR_CLUSTER());
+        info(S_flt_none);
+        return 1;
+    }
+    *(u16 *)DIRHDR = j;
+    gFilterCount = j;
+    gFilterCluster = DIR_CLUSTER();
+    return 1;
 }
 
 /* called by osMenu instead of its screen clear (through the RAM guard) */
@@ -983,7 +1085,7 @@ ROMB_CODE static int readArtFile(u16 tile, u16 *pal, int abortable)
     return 1;
 }
 
-static int loadArt(int abortable)
+__attribute__((noinline)) static int loadArtFile(int abortable)
 {
     u32 h = 0;
     u16 pal[14];
@@ -1021,6 +1123,17 @@ static int loadArt(int abortable)
     gArtCache = 1;
     gArtOk = 1;
     return 1;
+}
+
+/* osFind walks the card's folders and leaves the "current folder" of the browser's directory table
+ * (DIRHDR+2) on the last one it opened - /EDMD/ART. The browser reads it back (the parent it returns
+ * to with B, the folder the letter filter reloads), so every lookup of ours puts it back. */
+static int loadArt(int abortable)
+{
+    u32 keep = DIR_CLUSTER();
+    int r = loadArtFile(abortable);
+    DIR_CLUSTER() = keep;
+    return r;
 }
 
 /* draw the cover of the browser entry idx next to the list; returns 1 when drawn */

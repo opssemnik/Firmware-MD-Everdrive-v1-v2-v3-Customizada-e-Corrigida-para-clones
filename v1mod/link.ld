@@ -18,7 +18,7 @@ SECTIONS
     .text : { *(.text .text.*) *(.rodata .rodata.*) } > ROMA
     .strb : { *(.strb) *(.strb.text) } > ROMB
     .diag : { *(.diag) *(.diagro) } > ROMD
-    .strc : { *(.strc) } > ROMC
+    .strc : { *(.strc) *(.strc.text) } > ROMC
     .ramstub : { *(.ramstub) } > RAM AT > ROMA
     .data : { *(.data .data.*) } > RAM AT > ROMA
     .bss (NOLOAD) : { bssStart = .; *(.bss .bss.* COMMON) bssEnd = .; } > RAM

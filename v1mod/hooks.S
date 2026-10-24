@@ -158,10 +158,33 @@ ramEraseWait:
     dbra    %d7, 6b
     rts
 
+    .globl  ramBrowserC
+ramBrowserC:                    /* browser, after the UP/DOWN/RIGHT checks (was move.w $ffe30c,d0 at $ff693e) */
+    move.w  (0xFFE30C).l, %d0
+    btst    #5, %d0             /* C: letter filter */
+    beq.s   1f
+    CHECK   1f
+    tst.b   gBrowseMode         /* "Selecionar jogo" only, not the SRAM tools browser */
+    beq.s   1f
+    movem.l %d1-%d7/%a0-%a6, -(%sp)
+    jsr     browserFilter
+    movem.l (%sp)+, %d1-%d7/%a0-%a6
+    addq.l  #4, %sp             /* leave the button checks */
+    tst.l   %d0
+    beq.s   2f
+    moveq   #0, %d3             /* new list: cursor on its first entry */
+2:  jmp     0xFF64B4            /* redraw the page (not $ff6478: it would forget the folder depth) */
+1:  move.w  (0xFFE30C).l, %d0
+    rts
+
     .globl  ramPagePal
 ramPagePal:                     /* browser, before the page counter (was lea $ff8ed0,a3 at $ff64f4): every */
     lea     0xFF8ED0, %a3       /* page redraw passes here; d4 = palette 2 (gold) is pushed as the colour */
-    move.l  #0x4000, %d4        /* of the three "pág: x / y" prints */
+    CHECK   1f                  /* of the three "pág: x / y" prints; the letter filter tag goes next to it */
+    movem.l %d0-%d1/%a0-%a1, -(%sp)
+    jsr     drawFilterTag
+    movem.l (%sp)+, %d0-%d1/%a0-%a1
+1:  move.l  #0x4000, %d4
     rts
 
     .globl  ramBrowserBanner

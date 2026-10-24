@@ -6,6 +6,10 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.19 — 2026-10-19
+- **Filtro por letra**: botão **C** na lista de jogos. Escolha o grupo e a letra; a pasta passa a mostrar só os jogos que começam com ela (as pastas continuam), com `[M]` ao lado da página. "Todos" tira o filtro; trocar de pasta também. Letra sem jogos mostra um aviso e mantém a lista.
+- **Correção**: depois de uma capa aparecer na lista, entrar numa subpasta e voltar com B podia levar a `/EDMD/ART` (a busca da capa no SD mudava a "pasta atual" do navegador). Agora a pasta é preservada.
+
 ### 1.18 — 2026-10-19
 - **Margem antes do rodapé**: uma linha vazia entre o último jogo da página e a página (lista nas linhas 4-24, linha 25 vazia, página na 26).
 - A barra com o nome do arquivo ficou com **1 linha** (a 27): o nome mostra até 38 letras numa linha só, em vez de quebrar em duas.
@@ -110,6 +114,10 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.19 — 2026-10-19
+- **Filtro por letra**: novo item **Filtrar por Letra** no menu principal (botão C). Escolha o grupo e a letra; a pasta passa a mostrar só os jogos que começam com ela (as pastas continuam), com `[M]` ao lado da página. "Todos" tira o filtro; trocar de pasta também.
+- Correção interna: a volta do menu principal para a lista deixava 4 bytes perdidos na pilha a cada C.
 
 ### 1.18 — 2026-10-19
 - **Margem antes do rodapé**: uma linha vazia entre o último jogo da página e a página (lista nas linhas 4-24, linha 25 vazia, página na 26).

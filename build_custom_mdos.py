@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.18'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.19'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -282,8 +282,9 @@ def build_custom_mdos():
     # must not load box art/banner (same buffer) and calls resident code with jsr (far away).
     # =========================================================================
     ovl = Asm68k(0xFFC800)
-    for name in ('ovl_romInfo', 'ovl_about', 'ovl_options', 'ovl_recent', 'ovl_fav', 'ovl_cheats'):
-        ovl.bra_w(name)                             # entry offsets 0, 4, 8, 12, 16, 20
+    for name in ('ovl_romInfo', 'ovl_about', 'ovl_options', 'ovl_recent', 'ovl_fav', 'ovl_cheats',
+                 'ovl_filter'):
+        ovl.bra_w(name)                             # entry offsets 0, 4, 8, 12, 16, 20, 24
 
     # =========================================================================
     # Block 1: Helper routines at 0xFF0B92..0xFF0BFA (104 bytes of dead romFileMenu)
@@ -550,6 +551,8 @@ def build_custom_mdos():
     ext.bsr_w('applyTheme')
     ext.emit(0x42b9, 0x00ff, 0xc5a0)                # clr.l $ffc5a0.l (L/R flags + cursor)
     ext.emit(0x4279, 0x00ff, 0xc5a4)                # clr.w $ffc5a4.l (banner, wallpaper: not tried yet)
+    ext.emit(0x42b9, 0x00ff, 0xc5a8)                # clr.l $ffc5a8.l (letter filter tag)
+    ext.emit(0x4239, 0x00ff, 0xc5ac)                # clr.b $ffc5ac.l
     # Fixed VDP table addresses (the cart BIOS picks them; the v1 OS uses these): window 0xB000,
     # sprites 0xBC00, H scroll 0xB800, then zero the H scroll table and sprite 0. VRAM below 0xA000
     # is then free for the wallpaper tiles.
@@ -696,12 +699,43 @@ def build_custom_mdos():
     ext.emit(0x4a00)                                # tst.b d0
     ext.emit(0x4e75)                                # rts
 
+    # 3e. call_mainMenu_from_browser (jsr from the browser at 0xFF0FF0, C button)
+    ext.label('call_mainMenu_from_browser')
+    ext.bsr_w('mainMenu_v2')
+    ext.emit(0x4a00)                                # tst.b d0
+    ext.b_s(0x66, 'cm_err')
+    ext.emit(0x4a39, 0x00ff, 0xc5ac)                # tst.b $ffc5ac.l (the letter filter changed the list?)
+    ext.b_s(0x66, 'cm_new')
+    ext.emit(0x4e75)                                # rts (back to the browser at 0xFF0FF6)
+    ext.label('cm_new')
+    ext.emit(0x4239, 0x00ff, 0xc5ac)                # clr.b $ffc5ac.l
+    ext.emit(0x588f)                                # addq.l #4, a7
+    ext.emit(0x7800)                                # moveq #0, d4 (cursor on the first entry)
+    ext.emit(0x33fc, 0x0001, 0x00ff, 0x8008)        # move.w #1, $ff8008.l (full redraw)
+    ext.emit(0x4ef9, 0x00ff, 0x0dba)                # jmp $ff0dba.l (browser: draw the page)
+    ext.label('cm_err')
+    ext.emit(0x588f)                                # addq.l #4, a7
+    ext.emit(0x4ef9, 0x00ff, 0x0f3a)                # jmp $ff0f3a.l
+
+    # 3f. dirOpenHook: the browser reads a folder (jmp from 0xFF1C8C, ff1c8c's start): keep its cluster
+    # for the letter filter ($12 of the dir header changes with every file lookup) and drop the tag
+    ext.label('dirOpenHook')
+    ext.emit(0x23ef, 0x0004, 0x00ff, 0xc5b0)        # move.l 4(a7), $ffc5b0.l (the folder's cluster)
+    ext.emit(0x4239, 0x00ff, 0xc5a8)                # clr.b $ffc5a8.l (tag "[X]" off)
+    ext.emit(0x2f02)                                # move.l d2, -(a7)    (the replaced instructions)
+    ext.emit(0x2f2f, 0x0008)                        # move.l 8(a7), -(a7)
+    ext.emit(0x4ef9, 0x00ff, 0x1c92)                # jmp $ff1c92.l
+
     # 3d. pagePal: before the browser prints "Pág. x de y" (jsr from 0xFF09C2, replacing tst.b $ffc478.l):
     # palette 1 (gold); draw_top_banner puts palette 0 back afterwards
     ext.label('pagePal')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w
     ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
-    ext.emit(0x588f)                                # addq.l #4, a7
+    ext.emit(0x4878, 26)                            # pea.l 26.w (y)
+    ext.emit(0x4878, 18)                            # pea.l 18.w (x)
+    ext.emit(0x4879, 0x00ff, 0xc5a8)                # pea.l $ffc5a8.l ("[X]" or empty)
+    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
+    ext.emit(0x4fef, 0x0010)                        # lea.l $10(a7), a7
     ext.emit(0x4a39, 0x00ff, 0xc478)                # tst.b $ffc478.l (the replaced instruction)
     ext.emit(0x4e75)                                # rts
 
@@ -1157,6 +1191,11 @@ def build_custom_mdos():
     ext.label('rfm_ret0')
     ext.emit(0x7200)                                # moveq #0, d1
     ext.label('rfm_exit')
+    # Our file lookups (cover, overlay) leave dir_hdr+2 on another folder; the browser compares it with
+    # its own and reads the folder again when they differ, which would drop the letter filter. The
+    # entry table itself is untouched, so put the browser's folder (kept by dirOpenHook) back.
+    ext.emit(0x2079, 0x00ff, 0xc46c)                # movea.l $ffc46c.l, a0
+    ext.emit(0x2179, 0x00ff, 0xc5b0, 0x0002)        # move.l $ffc5b0.l, 2(a0)
     ext.emit(0x2001)                                # move.l d1, d0
     ext.bsr_w('rfmFixCursor')                       # browser cursor follows L/R
     ext.emit(0x4cdf, 0x1c7c)                        # movem.l (a7)+, d2-d6/a2-a4
@@ -1172,7 +1211,7 @@ def build_custom_mdos():
     ext.label('mm_loop')
     ext.emit(0x4257)                                # clr.w (a7)
     ext.emit(0x3f42, 0x0002)                        # move.w d2, $2(a7)
-    ext.emit(0x4878, 0x0007)                        # pea.l $7.w (7 items!)
+    ext.emit(0x4878, 0x0008)                        # pea.l $8.w (8 items)
     ext.pea_label('menu_main_7')
     ext.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
     ext.emit(0x3400)                                # move.w d0, d2
@@ -1242,8 +1281,20 @@ def build_custom_mdos():
 
     ext.label('mm_chk6')
     ext.emit(0x0c42, 0x0006)                        # cmpi.w #6, d2 (6 = Créditos)
-    ext.bne_w('mm_restore')
+    ext.bne_w('mm_chk7')
     ext.jsr_label('aboutScreen_ptbr')
+    ext.bra_w('mm_restore')
+
+    ext.label('mm_chk7')
+    ext.emit(0x0c42, 0x0007)                        # cmpi.w #7, d2 (7 = Filtrar por letra)
+    ext.bne_w('mm_restore')
+    ext.emit(0x7018)                                # moveq #24, d0 (overlay: filter)
+    ext.jsr_label('ovlEnter')
+    ext.emit(0x4a40)                                # tst.w d0 (0 = cancelled)
+    ext.beq_w('mm_restore')
+    ext.emit(0x13fc, 0x0001, 0x00ff, 0xc5ac)        # move.b #1, $ffc5ac.l (browser: new list)
+    ext.emit(0x7000)                                # moveq #0, d0
+    ext.bra_w('mm_exit')
 
     ext.label('mm_restore')
     ext.emit(0x486e, 0xee80)                        # pea.l -$1180(a6)
@@ -1289,6 +1340,7 @@ def build_custom_mdos():
         'str_mm_cheats',
         'str_mm_devinfo',
         'str_mm_about',
+        'str_mm_filter',
     ])
 
     emit_menu_table('menu_rom_5', [
@@ -1446,6 +1498,8 @@ def build_custom_mdos():
     ext.emit_str(b'Jogo Aleat\x86rio')
     ext.label('str_mm_cheats')
     ext.emit_str(b'Cheats')
+    ext.label('str_mm_filter')
+    ext.emit_str(b'Filtrar por Letra')
     ext.label('str_mm_devinfo')
     ext.emit_str(b'Info Sistema')
     ext.label('str_mm_about')
@@ -1981,7 +2035,146 @@ def build_custom_mdos():
     ovl.emit(0x4e5e)                                # unlk a6
     ovl.emit(0x4e75)                                # rts
 
+    # Filtrar por letra: group menu, then the letter; the folder is read again (its cluster was kept
+    # by dirOpenHook) and only the files starting with the letter stay in its entry table (folders
+    # always do). Returns d0 = 1 when the list changed (call_mainMenu_from_browser redraws it from
+    # the top), 0 when cancelled.
+    ovl.label('ovl_filter')
+    ovl.emit(0x48e7, 0x3e30)                        # movem.l d2-d6/a2-a3, -(a7)
+    ovl.emit(0x42a7)                                # clr.l -(a7)
+    ovl.emit(0x4878, 0x0006)                        # pea.l $6.w
+    ovl.pea_label('flt_groups')
+    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ovl.emit(0x0c40, 0xffff)                        # cmpi.w #$ffff, d0 (B)
+    ovl.beq_w('of_cancel')
+    ovl.emit(0x3400)                                # move.w d0, d2 (group)
+    ovl.emit(0x7600)                                # moveq #0, d3 (letter: none = Todos)
+    ovl.emit(0x0c42, 0x0005)                        # cmpi.w #5, d2
+    ovl.beq_w('of_apply')
+    ovl.emit(0x7623)                                # moveq #'#', d3 (0-9 and others)
+    ovl.emit(0x0c42, 0x0004)                        # cmpi.w #4, d2
+    ovl.beq_w('of_apply')
+    ovl.emit(0x3002)                                # move.w d2, d0
+    ovl.emit(0xe748)                                # lsl.w #3, d0 (8 bytes per group: menu, count)
+    ovl.lea_label(1, 'flt_subs')
+    ovl.emit(0xd2c0)                                # adda.w d0, a1
+    ovl.emit(0x42a7)                                # clr.l -(a7)
+    ovl.emit(0x2f29, 0x0004)                        # move.l 4(a1), -(a7) (count)
+    ovl.emit(0x2f11)                                # move.l (a1), -(a7) (menu)
+    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ovl.emit(0x0c40, 0xffff)                        # cmpi.w #$ffff, d0
+    ovl.beq_w('of_cancel')
+    ovl.emit(0x3602)                                # move.w d2, d3
+    ovl.emit(0xc6fc, 0x0006)                        # mulu.w #6, d3
+    ovl.emit(0xd640)                                # add.w d0, d3
+    ovl.emit(0x0643, 0x0041)                        # addi.w #'A', d3
+    ovl.label('of_apply')
+    ovl.emit(0x2f39, 0x00ff, 0xc5b0)                # move.l $ffc5b0.l, -(a7) (this folder's cluster)
+    ovl.emit(0x4eb9, 0x00ff, 0x1c8c)                # jsr $ff1c8c.l (read it again: whole list, tag off)
+    ovl.emit(0x588f)                                # addq.l #4, a7
+    ovl.emit(0x4a00)                                # tst.b d0
+    ovl.bne_w('of_done')
+    ovl.emit(0x4a03)                                # tst.b d3 (Todos?)
+    ovl.beq_w('of_done')
+    ovl.emit(0x2479, 0x00ff, 0xc46c)                # movea.l $ffc46c.l, a2
+    ovl.emit(0x47ea, 0x3016)                        # lea.l $3016(a2), a3 (entry pointers)
+    ovl.emit(0x3812)                                # move.w (a2), d4 (entries)
+    ovl.emit(0x7400)                                # moveq #0, d2 (read index)
+    ovl.emit(0x7a00)                                # moveq #0, d5 (write index)
+    ovl.label('of_loop')
+    ovl.emit(0xb444)                                # cmp.w d4, d2
+    ovl.bcc_w('of_end')
+    ovl.emit(0x7000, 0x3002, 0xe588)                # moveq #0, d0 ; move.w d2, d0 ; lsl.l #2, d0
+    ovl.emit(0x2c33, 0x0800)                        # move.l (a3, d0.l), d6 (entry)
+    ovl.emit(0x2046)                                # movea.l d6, a0
+    ovl.emit(0x4a68, 0x000a)                        # tst.w $a(a0) (folder: keep)
+    ovl.bne_w('of_keep')
+    ovl.emit(0x4879, 0x00ff, 0xd600)                # pea.l $ffd600.l
+    ovl.emit(0x2f06)                                # move.l d6, -(a7)
+    ovl.emit(0x4eb9, 0x00ff, 0x2872)                # jsr $ff2872.l (fatGetRec)
+    ovl.emit(0x508f)                                # addq.l #8, a7
+    ovl.emit(0x4a00)                                # tst.b d0
+    ovl.bne_w('of_next')
+    ovl.emit(0x1039, 0x00ff, 0xd60e)                # move.b $ffd60e.l, d0 (first letter of the name)
+    ovl.emit(0x0c00, 0x0061)                        # cmpi.b #'a', d0
+    ovl.b_s(0x65, 'of_up')
+    ovl.emit(0x0c00, 0x007a)                        # cmpi.b #'z', d0
+    ovl.b_s(0x62, 'of_up')
+    ovl.emit(0x0400, 0x0020)                        # subi.b #32, d0
+    ovl.label('of_up')
+    ovl.emit(0x0c03, 0x0023)                        # cmpi.b #'#', d3
+    ovl.b_s(0x66, 'of_cmp')
+    ovl.emit(0x0c00, 0x0041)                        # cmpi.b #'A', d0 (others: not A-Z)
+    ovl.b_s(0x65, 'of_keep')
+    ovl.emit(0x0c00, 0x005a)                        # cmpi.b #'Z', d0
+    ovl.b_s(0x62, 'of_keep')
+    ovl.b_s(0x60, 'of_next')
+    ovl.label('of_cmp')
+    ovl.emit(0xb003)                                # cmp.b d3, d0
+    ovl.b_s(0x66, 'of_next')
+    ovl.label('of_keep')
+    ovl.emit(0x7000, 0x3005, 0xe588)                # moveq #0, d0 ; move.w d5, d0 ; lsl.l #2, d0
+    ovl.emit(0x2786, 0x0800)                        # move.l d6, (a3, d0.l)
+    ovl.emit(0x5245)                                # addq.w #1, d5
+    ovl.label('of_next')
+    ovl.emit(0x5242)                                # addq.w #1, d2
+    ovl.bra_w('of_loop')
+    ovl.label('of_end')
+    ovl.emit(0x4a45)                                # tst.w d5 (nothing with that letter?)
+    ovl.b_s(0x66, 'of_some')
+    ovl.emit(0x2f39, 0x00ff, 0xc5b0)                # move.l $ffc5b0.l, -(a7)
+    ovl.emit(0x4eb9, 0x00ff, 0x1c8c)                # jsr $ff1c8c.l (whole folder again)
+    ovl.emit(0x588f)                                # addq.l #4, a7
+    ovl.emit(0x42a7)                                # clr.l -(a7)
+    ovl.emit(0x4878, 0x0001)                        # pea.l $1.w
+    ovl.pea_label('flt_none')
+    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw: message)
+    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
+    ovl.bra_w('of_done')
+    ovl.label('of_some')
+    ovl.emit(0x3485)                                # move.w d5, (a2) (entries: only the matches)
+    ovl.emit(0x13fc, 0x005b, 0x00ff, 0xc5a8)        # move.b #'[', $ffc5a8.l
+    ovl.emit(0x13c3, 0x00ff, 0xc5a9)                # move.b d3, $ffc5a9.l
+    ovl.emit(0x13fc, 0x005d, 0x00ff, 0xc5aa)        # move.b #']', $ffc5aa.l
+    ovl.emit(0x4239, 0x00ff, 0xc5ab)                # clr.b $ffc5ab.l
+    ovl.label('of_done')
+    ovl.emit(0x7001)                                # moveq #1, d0
+    ovl.b_s(0x60, 'of_ret')
+    ovl.label('of_cancel')
+    ovl.emit(0x7000)                                # moveq #0, d0
+    ovl.label('of_ret')
+    ovl.emit(0x4cdf, 0x0c7c)                        # movem.l (a7)+, d2-d6/a2-a3
+    ovl.emit(0x4e75)                                # rts
+
     ovl_code_end = len(ovl.buf)
+
+    # letter filter menus
+    def ovl_menu(label, names):
+        ovl.label(label)
+        base = len(ovl.buf)
+        ovl.emit_l(*([0] * len(names)))
+        for k, n in enumerate(names):
+            ovl.fixups.append((base + 4 * k, n, 'abs32'))
+    ovl_menu('flt_groups', ['str_flt_title', 'str_flt_af', 'str_flt_gl', 'str_flt_mr', 'str_flt_sz',
+                            'str_flt_num', 'str_flt_all'])
+    ovl_menu('flt_none', ['str_flt_title', 'str_flt_none'])
+    for g, (first, n) in enumerate((('A', 6), ('G', 6), ('M', 6), ('S', 8))):
+        ovl_menu(f'flt_g{g}', ['str_flt_title'] + [f'str_flt_{chr(ord(first) + k)}' for k in range(n)])
+    ovl.label('flt_subs')                           # per group: menu, item count
+    for g, n in enumerate((6, 6, 6, 8)):
+        base = len(ovl.buf)
+        ovl.emit_l(0, n)
+        ovl.fixups.append((base, f'flt_g{g}', 'abs32'))
+    for label, text in (('str_flt_title', b'Filtrar por Letra'), ('str_flt_af', b'A - F'), ('str_flt_gl', b'G - L'),
+                        ('str_flt_mr', b'M - R'), ('str_flt_sz', b'S - Z'), ('str_flt_num', b'0 - 9 e Outros'),
+                        ('str_flt_all', b'Todos (sem Filtro)'), ('str_flt_none', b'Nenhum Jogo com essa Letra')):
+        ovl.label(label)
+        ovl.emit_str(text)
+    for k in range(26):
+        ovl.label(f'str_flt_{chr(65 + k)}')
+        ovl.emit_str(bytes([65 + k]))
 
     # ---- overlay data
     ovl.label('about_table')
@@ -2079,14 +2272,6 @@ def build_custom_mdos():
     ovl.emit_str(b'C - menu principal')
 
 
-    # browser C button -> PT-BR main menu (moved here from ext for space)
-    blkB.label('call_mainMenu_from_browser')
-    blkB.bsr_w('mainMenu_v2')
-    blkB.emit(0x4a00)                               # tst.b d0
-    blkB.bne_w('browser_err_exit')
-    blkB.emit(0x4ef9, 0x00ff, 0x0ff6)                # jmp $ff0ff6.l
-    blkB.label('browser_err_exit')
-    blkB.emit(0x4ef9, 0x00ff, 0x0f3a)                # jmp $ff0f3a.l
 
     # Combine all labels across all blocks and resolve fixups
     all_labels = {}
@@ -2190,6 +2375,10 @@ def build_custom_mdos():
     # B7. wallpaper: end of the plane clear (ff37c2: lea $18(a7),a7; rts) -> jmp wallHook
     assert rom[0x37E0:0x37E6] == bytes.fromhex('4fef00184e75')
     struct.pack_into('>HI', rom, 0x37E0, 0x4EF9, all_labels['wallHook'])
+
+    # B8. folder (re)read: drop the letter filter tag (ff1c8c: move.l d2,-(a7); move.l 8(a7),-(a7))
+    assert rom[0x1C8C:0x1C92] == bytes.fromhex('2f022f2f0008')
+    struct.pack_into('>HI', rom, 0x1C8C, 0x4EF9, all_labels['dirOpenHook'])
 
     # B6. gDrawBox: highlight bar for the last item of the recents list
     assert rom[0x47EC:0x47F2] == bytes.fromhex('2ebc0000c000')

@@ -23,7 +23,7 @@ typedef struct {
 /* Directory entry as stored in the browser's directory table (12 bytes) */
 typedef struct {
     u32 dirsec;
-    u32 unk;
+    char key[4];        /* first 4 characters of the name, lower case (the browser sorts by it) */
     u16 idx;
     u16 isdir;
 } DirEnt;

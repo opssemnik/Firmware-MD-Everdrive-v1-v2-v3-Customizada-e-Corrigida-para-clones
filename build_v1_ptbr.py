@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.18'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.19'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -53,6 +53,14 @@ C_STRINGS = {
     'S_fm_load_start': 'Carregar e jogar',
     'S_fm_load_only': 'Só carregar',
     'S_fm_cheats': 'Jogar com cheats',
+    'S_flt_title': 'Filtrar por letra',
+    'S_flt_af': 'A - F',
+    'S_flt_gl': 'G - L',
+    'S_flt_mr': 'M - R',
+    'S_flt_sz': 'S - Z',
+    'S_flt_num': '0 - 9 e outros',
+    'S_flt_all': 'Todos (sem filtro)',
+    'S_flt_none': 'Nenhum jogo com essa letra',
     'S_fm_add_fav': 'Adicionar aos favoritos',
     'S_fm_rom_info': 'Info da ROM',
     'S_back': 'Voltar',
@@ -417,6 +425,7 @@ def main():
         patch(ram, bytes.fromhex('42a7'), bytes.fromhex('2f04'))       # clr.l -(sp) -> move.l d4,-(sp)
     patch(0xFF64EA, bytes.fromhex('48780002'), bytes.fromhex('48784001'))
     patch(0xFF64F4, bytes.fromhex('47f900ff8ed0'), jsr(syms['ramPagePal']))
+    patch(0xFF693E, bytes.fromhex('303900ffe30c'), jsr(syms['ramBrowserC']))       # C: letter filter
     patch(0xFF3FEC, bytes.fromhex('6100fd2e588f'), jsr(syms['ramCheatApply']))       # GG codes: START
     patch(0xFF5642, bytes.fromhex('303900a13002080000016' '7f4'), jsr(syms['ramEraseWait']) + bytes.fromhex('4e71') * 3)  # erase wait
     disp = syms['ramAbout'] - (0xFF7C0A + 2)

@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `5f68449c8db901b136deaae0d34799d1eafd6839359106546359d5b4c9dac13b` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `f99fdf16218d120b4bc7c29643d99a0c113c07364ba64368d199208d855a4d2d` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `64c0e07e90a83f86a9027499f7c6334ad0e9a25fe0109f49884df453f51ef272` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `5796243b6ecde7d6fd2bed55df61fcbef936d83c6f49955a81a32f9a81ff03e3` |
 
 **Releases** ([página de Releases](../../releases)), 4 arquivos:
 
@@ -35,6 +35,7 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
   nos recentes; o último item da lista, **[ LIMPAR RECENTES ]** (com uma faixa vermelha atrás), apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
+- **Filtro por letra** na lista de jogos: mostra só os jogos que começam com a letra escolhida
 - **Capas (box art)** dos jogos, lidas de `/EDMD/ART` no cartão SD
 - **Info da ROM**: nome, console, copyright, serial, região, checksum e tamanho lidos do cabeçalho SEGA
 - **4 temas de cores**: PADRÃO, RG POA, SEGA 16 e OUTRUN
@@ -75,6 +76,7 @@ checksum, então o cartucho não fica "brickado".
 | **START** | carrega e joga na hora |
 | **A** | numa pasta: entra; num jogo: abre o **menu do jogo** com a capa |
 | B | volta |
+| **C** | **filtro por letra**: escolha o grupo (A-F, G-L, M-R, S-Z, 0-9 e outros) e a letra; só os jogos com essa letra ficam na pasta (as pastas continuam), com `[M]` ao lado da página. "Todos" tira o filtro; trocar de pasta também |
 
 Menu do jogo: **Carregar e jogar**, **Só carregar**, **Jogar com cheats**, **Adicionar aos favoritos**,
 **Info da ROM**, **Voltar**. *Jogar com cheats* carrega o jogo, abre o menu de códigos Game Genie (digite ou
@@ -82,7 +84,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.18**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.19**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -109,14 +111,14 @@ próprio `MDOS.BIN` quando você as abre.
 | START | repete o último jogo |
 | **A** | menu do arquivo em tela cheia, com o nome do jogo e a capa (Carregar e Jogar, Só Carregar, Jogar com Cheats, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
 | B | volta |
-| **C** | menu principal (Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos) |
+| **C** | menu principal (Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos, **Filtrar por Letra**). O filtro mostra só os jogos da letra escolhida na pasta (as pastas continuam), com `[M]` ao lado da página; "Todos" tira o filtro |
 
 **Capa na lista:** parado ~0,3 s sobre um jogo, a capa aparece no centro à direita da lista;
 qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega nada.
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.18**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.19**.
 
 ---
 
