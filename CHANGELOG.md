@@ -6,6 +6,13 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.22 — 2026-10-24
+- **Nova arquitetura: OS + extensão.** O `OS-V38-PTBR.BIN` agora é só um carregador; todo o mod (tradução, menus, capas, busca...) fica em `/EDMD/V1EXT.BIN`. No boot, o cartucho compara o arquivo do cartão com a cópia na flash (bloco `0x40000`) e regrava só quando mudou (~1 s, "Atualizando o mod PT-BR..."). **Grave este OS uma vez** (Ferramentas → gravar OS); as próximas versões poderão vir só como um `V1EXT.BIN` novo.
+- Sem a extensão (nunca instalada) roda o OS original, em inglês. Segurar **B** ao ligar também abre o OS original (para escapar de uma extensão com problema).
+- **C na lista de jogos agora abre direto a busca em todas as pastas** (por nome ou pela primeira letra). O filtro por letra da pasta foi removido: as pastas já são paginadas.
+- **B nos resultados volta para a pasta onde você estava**, com o cursor no mesmo jogo. Uma busca nova a partir dos resultados troca a lista no mesmo nível.
+- Barra de ajuda alinhada com a lista: `A: menu   START: jogar    C: buscar`.
+
 ### 1.21 — 2026-10-24
 - **Busca em todas as pastas**: botão **C** na lista de jogos → *Buscar em todas as pastas*. Procura no cartão inteiro (menos `EDMD`) **por letra** ou **por nome**, num teclado na tela (A digita, B apaga, START busca; várias palavras precisam aparecer todas, em qualquer ordem). Os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página: capa, menu do jogo e START funcionam como sempre. B ou "Todos" voltam às pastas; B durante a busca para.
 - A busca fica numa **extensão**, `/EDMD/V1EXT.BIN` (vem no `SD-EverDrive-v1.zip`): na primeira busca ela é copiada para um bloco livre da flash do cartucho (`0x40000`, ~1 s). Sem o arquivo aparece "Falta /EDMD/V1EXT.BIN" e o resto funciona normalmente.
@@ -122,6 +129,11 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.22 — 2026-10-24
+- **Busca em todas as pastas** (C → *Buscar em Todas as Pastas*, o primeiro item do menu): por nome, num teclado na tela (várias palavras: todas precisam aparecer), ou pela primeira letra. Os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página; capa, menu do arquivo e START funcionam normalmente, e **B** volta para a pasta onde você estava.
+- O **Filtrar por Letra** foi removido (substituído pela busca).
+- Barra de ajuda alinhada com a lista: `A: arquivo   START: repetir   C: menu`.
 
 ### 1.21 — 2026-10-24
 - Sem mudanças de código; só a versão (mesma numeração da v1). A busca em todas as pastas chega à v3 na próxima versão.

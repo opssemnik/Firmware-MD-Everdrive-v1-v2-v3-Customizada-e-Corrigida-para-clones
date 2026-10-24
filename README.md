@@ -8,17 +8,18 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `4a7d25a209f08edd21faf82f4f47fa16d380c65a31417c572054584b91baee55` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `754c07bcdcf2ef02d5a25cab4ae335e8163970f2d5e708851c3dd76b6c976ec0` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
+| EverDrive-MD **v1** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 | `0cd8b887cfc90e09441496728fc8b1f28ba3514fa8eba97128265465f96f35ce` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `327d0b76584bb63640bc87845f4dd03b7b4541f366087f8c19e7914b0f82dba5` |
 
 **Releases** ([página de Releases](../../releases)), 4 arquivos:
 
 | Arquivo | O que é |
 |---|---|
-| `OS-V38-PTBR.BIN` | firmware da v1 (gravar pelo próprio cartucho) |
-| `MDOS.BIN` | firmware da v3, já com o nome certo |
-| `SD-EverDrive-v1.zip` | para a raiz do cartão SD: `OS-V38-PTBR.BIN` (firmware da v1) e a pasta `EDMD` com a extensão da v1 (`V1EXT.BIN`, usada pela busca), capas, banner e wallpaper |
-| `SD-EverDrive-v3.zip` | o mesmo, mais `EDMD/MDOS.BIN` (o firmware da v3) |
+| `SD-EverDrive-v1.zip` | **v1**, para a raiz do cartão SD: `OS-V38-PTBR.BIN` (o firmware, para gravar uma vez) e a pasta `EDMD` com `V1EXT.BIN` (a extensão, com todo o mod), capas, banner e wallpaper |
+| `SD-EverDrive-v1-sem-capas.zip` | **v1**, só o firmware e a extensão (`OS-V38-PTBR.BIN` + `EDMD/V1EXT.BIN`) |
+| `MDOS.BIN` | firmware da **v3**, já com o nome certo |
+| `SD-EverDrive-v3.zip` | **v3**, para a raiz do cartão SD: `EDMD/MDOS.BIN` (o firmware), capas, banner e wallpaper |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -35,9 +36,9 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
   nos recentes; o último item da lista, **[ LIMPAR RECENTES ]** (com uma faixa vermelha atrás), apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
-- **Filtro por letra** na lista de jogos: mostra só os jogos que começam com a letra escolhida
-- **Busca em todas as pastas** (v1; v3 em breve): pela primeira letra ou por palavras do nome, digitadas
-  num teclado na tela; os resultados viram uma lista normal (capa, menu do jogo, START para jogar)
+- **Busca em todas as pastas**: pela primeira letra ou por palavras do nome, digitadas num teclado na
+  tela; os resultados viram uma lista normal (capa, menu do jogo, START para jogar) e B volta para a
+  pasta onde você estava
 - **Capas (box art)** dos jogos, lidas de `/EDMD/ART` no cartão SD
 - **Info da ROM**: nome, console, copyright, serial, região, checksum e tamanho lidos do cabeçalho SEGA
 - **4 temas de cores**: PADRÃO, RG POA, SEGA 16 e OUTRUN
@@ -61,10 +62,20 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 ## EverDrive-MD v1
 
 ### Instalação
-1. Extraia o `SD-EverDrive-v1.zip` da release na raiz do cartão SD (traz o `OS-V38-PTBR.BIN` e a pasta `EDMD`,
-   com o `EDMD/V1EXT.BIN` que a busca usa). Ou copie só o `OS-V38-PTBR.BIN` (tudo funciona, menos a busca).
-2. No cartucho: **Ferramentas → gravar OS** (no OS original: *toolbox → update OS*), escolha o arquivo e confirme.
-3. O console reinicia sozinho com o novo OS.
+1. Extraia o `SD-EverDrive-v1.zip` (ou o `-sem-capas`) da release na raiz do cartão SD: ele traz o
+   `OS-V38-PTBR.BIN` e o `EDMD/V1EXT.BIN`.
+2. No cartucho: **Ferramentas → gravar OS** (no OS original: *toolbox → update OS*), escolha o
+   `OS-V38-PTBR.BIN` e confirme. O console reinicia sozinho.
+3. No primeiro boot aparece "Atualizando o mod PT-BR..." por cerca de 1 segundo: a extensão é copiada
+   do cartão para o cartucho.
+
+**Atualizações:** o `OS-V38-PTBR.BIN` é só um carregador; todo o mod fica no `EDMD/V1EXT.BIN`. Para
+atualizar, basta trocar esse arquivo no cartão: no boot seguinte o cartucho vê que mudou e copia a
+versão nova sozinho. Só é preciso gravar o OS de novo quando a release disser.
+
+**Sem a extensão** (arquivo apagado e nunca instalado) o cartucho roda o OS original, em inglês.
+Segurando **B** ao ligar, ele também ignora a extensão e abre o OS original (útil se uma extensão nova
+der problema: troque o arquivo no cartão e ligue de novo).
 
 ### Recuperação (se algo der errado)
 Segure **A + B + C** ao ligar o console. Abre o *OS repair tool* do boot loader, que grava qualquer
@@ -79,8 +90,7 @@ checksum, então o cartucho não fica "brickado".
 | **START** | carrega e joga na hora |
 | **A** | numa pasta: entra; num jogo: abre o **menu do jogo** com a capa |
 | B | volta |
-| **C** | **filtro por letra**: escolha o grupo (A-F, G-L, M-R, S-Z, 0-9 e outros) e a letra; só os jogos com essa letra ficam na pasta (as pastas continuam), com `[M]` ao lado da página. "Todos" tira o filtro; trocar de pasta também |
-| **C → Buscar em todas as pastas** | procura no cartão inteiro (menos `EDMD`) **por letra** ou **por nome** (teclado na tela: A digita, B apaga, START busca; várias palavras = todas precisam aparecer, em qualquer ordem). Os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página; B ou "Todos" voltam às pastas. B durante a busca para |
+| **C** | **busca em todas as pastas** (menos `EDMD`): **por nome** (teclado na tela: A digita, B apaga, START busca; várias palavras = todas precisam aparecer, em qualquer ordem) ou **pela primeira letra**. Os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página; **B** volta para a pasta onde você estava. B durante a busca para |
 
 Menu do jogo: **Carregar e jogar**, **Só carregar**, **Jogar com cheats**, **Adicionar aos favoritos**,
 **Info da ROM**, **Voltar**. *Jogar com cheats* carrega o jogo, abre o menu de códigos Game Genie (digite ou
@@ -88,16 +98,16 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.21**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.22**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
 - Antes de carregar um recente/favorito o OS confere se o arquivo ainda é o mesmo no cartão; se você apagou ou trocou, aparece "Arquivo não encontrado no SD" em vez de carregar lixo.
 - O jogo aleatório parte da última pasta aberta e desce pelas subpastas (ignora `EDMD`), escolhendo só `.bin .md .gen .smd .sms .32x`.
-- O OS do v1 (64 KB) está cheio, então a busca fica numa **extensão**: `/EDMD/V1EXT.BIN`. Na primeira busca
-  depois de gravar um OS novo, ela é copiada para o bloco `0x40000` da flash do cartucho (livre: o OS
-  original não usa a faixa `0x40000-0xCFFFF`), o que leva cerca de 1 segundo. Cada versão do OS só aceita
-  o `V1EXT.BIN` da mesma versão; sem ele, aparece "Falta /EDMD/V1EXT.BIN" e o resto funciona normalmente.
+- A extensão fica no bloco `0x40000` da flash do cartucho (64 KB, livre: o OS original não usa a faixa
+  `0x40000-0xCFFFF`). No boot, o carregador compara o cabeçalho do `/EDMD/V1EXT.BIN` com o da cópia na
+  flash e só regrava quando mudou; o cabeçalho é gravado por último, então uma cópia interrompida nunca
+  passa por completa. Sem cartão, roda a cópia que já está na flash.
 
 ---
 
@@ -109,8 +119,8 @@ O v3 carrega o OS do cartão SD: o firmware fica em **`/EDMD/MDOS.BIN`**. O jeit
 Compilando você mesmo, renomeie `MDOS.ptbr.BIN` para `MDOS.BIN`. Para voltar ao original, basta recolocar o `MDOS.BIN` original.
 
 O nome e a pasta precisam ser exatamente esses: a BIOS só carrega os primeiros 32 KB do arquivo, e as
-telas de Info da ROM, Opções, Recentes/Favoritos, Créditos e *Jogar com Cheats* são lidas do resto do
-próprio `MDOS.BIN` quando você as abre.
+telas de Info da ROM, Opções, Recentes/Favoritos, Créditos, *Jogar com Cheats* e a busca são lidas do
+resto do próprio `MDOS.BIN` quando você as abre.
 
 ### Controles
 | Botão | Ação |
@@ -119,14 +129,14 @@ próprio `MDOS.BIN` quando você as abre.
 | START | repete o último jogo |
 | **A** | menu do arquivo em tela cheia, com o nome do jogo e a capa (Carregar e Jogar, Só Carregar, Jogar com Cheats, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
 | B | volta |
-| **C** | menu principal (Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos, **Filtrar por Letra**). O filtro mostra só os jogos da letra escolhida na pasta (as pastas continuam), com `[M]` ao lado da página; "Todos" tira o filtro |
+| **C** | menu principal: **Buscar em Todas as Pastas** (o primeiro item: C e A), Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos. A busca funciona como na v1: por nome (teclado na tela) ou pela primeira letra; os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página, e **B** volta para a pasta onde você estava |
 
 **Capa na lista:** parado ~0,3 s sobre um jogo, a capa aparece no centro à direita da lista;
 qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega nada.
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.21**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.22**.
 
 ---
 
@@ -212,7 +222,9 @@ Os arquivos originais **não** estão no repositório. Coloque-os na pasta do pr
 | v1 (`build_v1_ptbr.py`) | `OS-V38.BIN` (dump do seu v1), `os-v36-retrogamer-poa.bin` (bloco do logo RetroGamer POA) |
 | v3 (`build_custom_mdos.py`) | `MDOS.patched.BIN` |
 
-**v1** — o código novo é C + assembly em [`v1mod/`](v1mod), compilado com GCC m68k no WSL (Debian):
+**v1** — o código novo é C + assembly em [`v1mod/`](v1mod), compilado com GCC m68k no WSL (Debian).
+`loader.c` é o carregador que vai no OS; o resto (`mod.c`, `search.c`, `hooks.S`) vira o `V1EXT.BIN`,
+junto com a tabela de alterações do OS em RAM (tradução e ganchos) que a extensão aplica no boot:
 
 ```
 # dentro do WSL (ou sem root: apt-get download + dpkg -x, veja v1mod/build.sh)
@@ -222,9 +234,8 @@ pip install capstone
 python build_v1_ptbr.py          # gera OS-V38-PTBR.BIN + V1EXT.BIN (extensão) e confere todos os patches
 ```
 
-O script verifica cada byte original antes de alterar, posiciona o código nas áreas livres da flash
-e grava uma assinatura no fim da imagem. Se uma atualização de OS falhar no meio, os menus voltam
-para as rotinas originais e você continua dentro de Ferramentas para tentar de novo.
+O script verifica cada byte original antes de alterar (a extensão confere de novo no cartucho, antes de
+aplicar) e só muda o `OS-V38-PTBR.BIN` quando o carregador muda.
 
 **Testes (v1)** — `v1mod/test/` roda o OS de verdade num emulador 68000 (Unicorn) com VDP, flash,
 controle e cartão SD simulados, inclusive com a checagem de alinhamento de memória do 68000 real:
@@ -232,14 +243,15 @@ controle e cartão SD simulados, inclusive com a checagem de alinhamento de mem�
 ```
 pip install unicorn==2.1.4 pillow capstone
 # gera um cartão SD de teste (FAT32) via mtools/dosfstools no WSL: mkimg.py + mkimg.sh
-python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py ; python t_filter.py ; python t_search.py
+python t_all.py all ; python t_edge.py ; python t_preview.py ; python t_mine4.py ; python t_search.py ; python t_loader.py
 # v3 (emu3.py, mesmo emulador com BIOS do cartucho simulado)
-python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py ; python t3_flicker.py ; python t3_banner.py ; python t3_ovl.py ; python t3_nomdos.py
+python t3_preview.py ; python t3_flows.py ; python t3_lr.py ; python t3_version.py ; python t3_recent.py ; python t3_v16.py ; python t3_flicker.py ; python t3_banner.py ; python t3_ovl.py ; python t3_nomdos.py ; python t3_search.py
 # rode sdput.sh (WSL) depois de compilar, para copiar o MDOS.BIN e o V1EXT.BIN novos para as imagens do SD
 # banner: t_banner.py / t3_banner.py usam sd/sdb.img; wallpaper: t_wall.py v1|v3 usa sd/sdw.img
 ```
 
-**v3** — rode a partir da pasta acima de `mega-genesis/`:
+**v3** — assembly montado pelo próprio script, mais a busca em C ([`v3mod/`](v3mod), mesmo GCC do v1, vira a
+segunda página de telas do `MDOS.BIN`). Rode a partir da pasta acima de `mega-genesis/`:
 
 ```
 python mega-genesis/build_custom_mdos.py

@@ -13,3 +13,7 @@ cp sd.img sdw.img
 mcopy -o -i sdw.img "$R/sd/EDMD/BANNER.ART" ::/EDMD/BANNER.ART
 mcopy -o -i sdw.img "$R/sd/EDMD/WALL.ART" ::/EDMD/WALL.ART
 cp sd.img sdn.img && mdel -i sdn.img ::/EDMD/MDOS.BIN
+# t_loader.py: sdx.img = sd.img without V1EXT.BIN, sdo.img = a V1EXT.BIN made for another loader (abi 9)
+cp sd.img sdx.img && mdel -i sdx.img ::/EDMD/V1EXT.BIN
+head -c 2560 /dev/zero | tr '\0' 'x' > /tmp/old.bin && printf 'PTBX\x00\x00\x00\x09' | dd of=/tmp/old.bin conv=notrunc 2>/dev/null
+cp sd.img sdo.img && mcopy -o -i sdo.img /tmp/old.bin ::/EDMD/V1EXT.BIN

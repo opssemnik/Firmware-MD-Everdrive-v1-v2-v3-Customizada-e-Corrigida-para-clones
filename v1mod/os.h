@@ -56,6 +56,9 @@ typedef struct {
 #define osOptions    ((void (*)(void))0xFF5CE6)
 #define osCheats     ((void (*)(void))0xFF3FF8)
 #define osReadSettings ((void (*)(void))0xFF5B9E)
+#define osToolbox    ((void (*)(void))0xFF7B68)
+#define osMainMenu   ((void (*)(void))0xFF528E)     /* stock, run by the loader without an extension */
+#define osReadPad    ((u32 (*)(u32 port))0xFF843C)   /* reads the pad itself: BTN_* bits */
 
 /* ---- game ---- */
 #define osLoadGame   ((u8 (*)(Rec *r))0xFF4C06)
@@ -97,6 +100,20 @@ typedef struct {
 /* scratch: the browser page cache, free whenever it is reloaded afterwards */
 #define SCRATCH RECCACHE
 #define SCRATCH_SIZE (21 * 0x110)
+
+/* flash extension (/EDMD/V1EXT.BIN -> cart 0x40000): header shared by the loader and the extension */
+typedef struct {
+    u32 magic;          /* EXT_MAGIC */
+    u32 abi;            /* EXT_ABI: what the loader expects of the extension */
+    u32 id;             /* build id of the extension */
+    u32 size;           /* bytes (set by the build) */
+    u32 (*main)(void);  /* patches the OS and runs the main menu; returns only on failure */
+} ExtHdr;
+#define EXT_ADDR 0x40000
+#define EXT_HDR ((const ExtHdr *)EXT_ADDR)
+#define EXT_MAGIC 0x50544258            /* 'PTBX' */
+#define EXT_ABI 1
+#define PATCH_MAX 0x1000
 
 #define BTN_UP 0x01
 #define BTN_DOWN 0x02

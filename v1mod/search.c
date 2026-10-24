@@ -1,31 +1,24 @@
 /*
- * Flash extension (included at the end of mod.c): code that no longer fits in the OS image. It is linked
- * at cart 0x40000 (a flash block the OS never uses), shipped as /EDMD/V1EXT.BIN and copied into the
- * flash by extInstall the first time it is needed after an OS update. The base OS enters it only through
- * extSearch, after checking the header (same build id), so nothing here may be inlined into the base:
- * every function is EXT_CODE, every constant EXT_RO.
+ * Search in every folder (included at the end of mod.c): C in the browser. By first letter (the
+ * directory table's sort key, no SD reads) or by words of the name typed on an on-screen keyboard.
  */
-#define EXT_CODE __attribute__((section(".ext.text"), noinline))
-#define EXT_RO __attribute__((section(".ext.ro")))
-
-const u32 extHdr[2] __attribute__((section(".exthdr"), used)) = {EXT_MAGIC, BUILD_ID};
 
 /* ---------------------------------------------------------------- search in every folder */
 
 #define SR_MAX 512                      /* the browser's directory table holds 512 entries */
 
-static u8 gSrFull;                      /* the results (or the folder stack) did not fit: list cut */
+static u8 gSrFull;                     /* the results (or the folder stack) did not fit: list cut */
 
 /* on-screen keyboard: 4 rows of 10 keys, then ESPACO / APAGAR / BUSCAR */
-static const char kbKeys[] EXT_RO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'&";
-static const u8 kbBtnX[3] EXT_RO = {0, 4, 7};
+static const char kbKeys[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'&";
+static const u8 kbBtnX[3] = {0, 4, 7};
 #define KB_LEN 20
 #define KB_X 5
 #define KB_Y 9
 
-EXT_CODE static void kbDraw(const char *q, int n, int cx, int cy)
+static void kbDraw(const char *q, int n, int cx, int cy)
 {
-    static const char *const btn[3] EXT_RO = {SX_space, SX_del, SX_ok};
+    static const char *const btn[3] = {SX_space, SX_del, SX_ok};
     char b[KB_LEN + 4];
     int i, x, y;
 
@@ -44,7 +37,7 @@ EXT_CODE static void kbDraw(const char *q, int n, int cx, int cy)
             b[3] = 0;
             osPrint(PLANE_A, b, sel ? PAL2 : PAL0, KB_X + x * 3, KB_Y + y * 2);
         }
-    for (i = 0; i < 3; i++) {           /* (no string literals here: they would land in the base .rodata) */
+    for (i = 0; i < 3; i++) {
         int sel = cy == 4 && cx * 3 / 10 == i;
         u32 attr = sel ? PAL2 : PAL0;
         char *p = b;
@@ -57,7 +50,7 @@ EXT_CODE static void kbDraw(const char *q, int n, int cx, int cy)
 }
 
 /* types the search text into q (upper case, words split by single spaces); returns its length, 0 = cancel */
-EXT_CODE static int kbInput(char *q)
+static int kbInput(char *q)
 {
     int n = 0, cx = 0, cy = 0;
     u16 k;
@@ -110,7 +103,7 @@ EXT_CODE static int kbInput(char *q)
 }
 
 /* every word of q (upper case) appears somewhere in name, in any order, ignoring case */
-EXT_CODE static int nameHas(const char *name, const char *q)
+static int nameHas(const char *name, const char *q)
 {
     while (*q) {
         const char *te = q, *s;
@@ -131,9 +124,9 @@ EXT_CODE static int nameHas(const char *name, const char *q)
 }
 
 /* cluster of the folder entry e, 0 for ".", ".." and /EDMD (covers, firmware: not games) */
-EXT_CODE static u32 subdirCluster(const DirEnt *e)
+static u32 subdirCluster(const DirEnt *e)
 {
-    static const char edmd[11] EXT_RO = "EDMD       ";
+    static const char edmd[11] = "EDMD       ";
     const u8 *d;
     int i;
 
@@ -151,7 +144,7 @@ EXT_CODE static u32 subdirCluster(const DirEnt *e)
 
 /* files of e's folder that match: letter ('A'..'Z', '#' = others) by the table's sort key (no SD
  * reads), or the words of q in the long name (reads it; ROM files only) */
-EXT_CODE static int srMatch(DirEnt *e, char letter, const char *q)
+static int srMatch(DirEnt *e, char letter, const char *q)
 {
     char c;
     if (q)
@@ -165,7 +158,7 @@ EXT_CODE static int srMatch(DirEnt *e, char letter, const char *q)
 /* walks every folder of the card from the root (depth first). Matching entries are copied to the
  * browser page cache (RECCACHE: 512 x 12 bytes from its start), the folders still to visit are kept at
  * its end, growing down. Returns the number of results, -1 when stopped with B. */
-EXT_CODE static int srWalk(char letter, const char *q)
+static int srWalk(char letter, const char *q)
 {
     DirEnt *res = (DirEnt *)RECCACHE;
     u32 *top = (u32 *)(RECCACHE + SCRATCH_SIZE), *stk = top;
@@ -206,8 +199,9 @@ EXT_CODE static int srWalk(char letter, const char *q)
 }
 
 /* the results become the browser's directory table (sorted like a folder), shown as a folder of its own
- * ("[*]" next to the page counter); B or "Todos" in the C menu go back to the real folders */
-EXT_CODE static void srShow(int n, u32 cluster)
+ * ("[*]" next to the page counter); ramBrowserC files it under the folder the search started in, so B
+ * goes back there */
+static void srShow(int n, u32 cluster)
 {
     DirEnt *tab = (DirEnt *)(DIRHDR + 0x12);
     int i, j;
@@ -222,21 +216,32 @@ EXT_CODE static void srShow(int n, u32 cluster)
     }
     *(u16 *)DIRHDR = n;
     DIR_CLUSTER() = cluster;
-    gFilter = '*';
-    gFilterCount = n;
-    gFilterCluster = cluster;
+    gSrCount = n;
+    gSrCluster = cluster;
+    gSrFirst = DIR_ENT(0)->dirsec;
 }
 
-/* C menu -> "Buscar em todas as pastas": by first letter or by words of the name. Returns 1 when the
- * browser list changed. */
-EXT_CODE u32 srchMain(void)
+/* back to the browser: it redraws only the list and the footer */
+static void srRedraw(void)
 {
-    static const char *const modes[] EXT_RO = {SX_by_name, S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num};
+    osClear();
+    drawWallpaper();
+    drawBanner(PLANE_B);
+    PAGE_CACHE = 0xFFFF;
+}
+
+/* browser, C (ramBrowserC); the browser redraws the page afterwards. Returns what ramBrowserC does with
+ * its folder levels: 0 cancelled, 1 another list on the same level, 2 results from a folder (one level
+ * down, like a subfolder: B goes back to the folder), 3 nothing found from the results (back up to the
+ * folder the search started in). */
+u32 browserSearch(void)
+{
+    static const char *const modes[] = {SX_by_name, S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num};
     static char letters[8][2];
     const char *items[8];
     char q[KB_LEN + 1], letter = 0;
     u32 cluster = DIR_CLUSTER();
-    int r, n, i;
+    int r, n, i, in = inResults();
 
     gTitle = SX_title;
     gOverlay = overlayTitle;
@@ -254,8 +259,10 @@ EXT_CODE u32 srchMain(void)
         letter = '#';
     }
     gOverlay = 0;
-    if ((r & 0x40) || (!letter && !kbInput(q)))
+    if ((r & 0x40) || (!letter && !kbInput(q))) {
+        srRedraw();
         return 0;
+    }
     clearWithBanner();
     center(SX_searching, PAL2, 9);
     center(SX_stop, PAL1, 26);
@@ -265,13 +272,14 @@ EXT_CODE u32 srchMain(void)
     if (n <= 0) {
         osOpenDir(cluster);             /* the walk replaced the browser's table: the folder again */
         DIR_CLUSTER() = cluster;
-        gFilter = 0;
         if (!n)
             info(S_no_games);
-        return 1;
+        srRedraw();
+        return in ? 3 : 1;
     }
     srShow(n, cluster);
     if (gSrFull)
         info(SX_full);
-    return 1;
+    srRedraw();
+    return in ? 1 : 2;
 }

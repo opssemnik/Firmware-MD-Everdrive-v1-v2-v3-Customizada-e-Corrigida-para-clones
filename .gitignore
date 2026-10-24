@@ -32,6 +32,8 @@
 # código-fonte do mod v1 (sem a pasta build/, que é gerada)
 !/v1mod/
 /v1mod/build/
+!/v3mod/
+/v3mod/build/
 __pycache__/
 *.pyc
 /v1mod/test/sd/

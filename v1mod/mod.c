@@ -1,7 +1,8 @@
 /*
- * EverDrive-MD v1 (OS v38) PT-BR mod - new features.
- * Runs from the OS flash image (cart 0x1Cxxx-0x1Fxxx); only ever entered while the
- * OS flash is in read mode. Stock RAM routines do all flash erase/program work.
+ * EverDrive-MD v1 (OS v38) PT-BR mod - everything but the loader (loader.c).
+ * Runs from the flash extension block (cart 0x40000, /EDMD/V1EXT.BIN): extMain patches the RAM-resident
+ * OS (translation + hooks, table filled in by the build) and runs the main menu. Only ever entered while
+ * the flash is in read mode; stock RAM routines do all flash erase/program work.
  */
 #include "os.h"
 #include "gen.h"
@@ -57,9 +58,6 @@ static u8 gSector0[512] __attribute__((aligned(4)));   /* SD/OS routines access 
 static u8 gArtBuf[512] __attribute__((aligned(4)));
 static u32 gArtHash;
 static u8 gArtCache;                    /* 0 none, 1 = art of gArtHash is in VRAM, 2 = it has no art */
-/* code that does not fit in ROMA goes with the strings in the blank POA logo rows (ROMB) */
-#define ROMB_CODE __attribute__((section(".strb.text")))
-#define ROMC_CODE __attribute__((section(".strc.text")))
 
 static u8 gBanner;                      /* 0 not tried yet, 1 no image, 2 /EDMD/BANNER.ART loaded */
 static u16 gBannerPal[14];
@@ -74,7 +72,6 @@ static u8 gWall;                        /* 1 = /EDMD/WALL.ART loaded */
 
 #define PREVIEW_DELAY 19                /* frames resting on a ROM before its cover loads (~0.32 s) */
 
-extern void ramToolbox(void);           /* RAM trampoline (hooks.S) */
 extern const u8 ramStubStart[], ramStubEnd[];
 extern u8 ramStubRam[];
 extern u8 bssStart[], bssEnd[];
@@ -205,7 +202,7 @@ static void applyTheme(void)
 static int readArtFile(u16 tile, u16 *pal, int abortable);
 
 /* /EDMD/BANNER.ART: same layout as a box-art file, 36x3 tiles (288x24 px) */
-ROMB_CODE static void loadBanner(void)
+static void loadBanner(void)
 {
     if (osFind(S_banner_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0)
         || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0))
@@ -217,7 +214,7 @@ ROMB_CODE static void loadBanner(void)
 /* /EDMD/WALL.ART (make_wallpaper.py): word 0 = tile count, palette 1 colours 1..14, the 40x28
  * plane B names (palette and tile numbers already in place) -> VRAM WALL_MAP, then the tiles.
  * After the 32-byte header everything is 32-byte blocks, so it streams with osLoadTiles. */
-ROMB_CODE static void loadWallpaper(void)
+static void loadWallpaper(void)
 {
     u32 b = 0, n = 0;
     int s, i;
@@ -245,7 +242,7 @@ ROMB_CODE static void loadWallpaper(void)
 }
 
 /* first banner/wallpaper use: mount the card (once) and load both images */
-ROMB_CODE __attribute__((noinline)) static void loadImagesOnce(void)
+__attribute__((noinline)) static void loadImagesOnce(void)
 {
     gBanner = 1;
     if (!FAT_READY) {
@@ -265,7 +262,7 @@ static void loadImages(void)
 }
 
 /* the wallpaper on plane B: its names are copied from the VRAM copy, row by row */
-ROMB_CODE static void drawWallpaper(void)
+static void drawWallpaper(void)
 {
     u16 row[40], sr;
     int y, x;
@@ -288,7 +285,7 @@ ROMB_CODE static void drawWallpaper(void)
 }
 
 /* RETROGAMER POA on top: the image banner (rows 0-2) or the built-in one (row 1) */
-ROMB_CODE static void drawBanner(u32 plane)
+static void drawBanner(u32 plane)
 {
     if (!gBanner)
         loadImages();
@@ -300,25 +297,31 @@ ROMB_CODE static void drawBanner(u32 plane)
 
 /* browser full redraw (ramBrowserBanner): its list starts on row 4 (a blank row under the banner). Plane B,
  * because entering a folder clears rows 0-24 of plane A only. */
-static char gFilter;                    /* browser letter filter: 'A'..'Z', '#' (others), 0 = none */
-static u16 gFilterCount;                /* the filtered folder, to notice when the browser reloads it */
-static u32 gFilterCluster;
+static u16 gSrCount;                    /* search results shown as the browser's list (0 = none): */
+static u32 gSrCluster, gSrFirst;        /* noticed gone when the table holds something else */
 
-/* "[M]" next to the page counter while a filter is on (blank otherwise) and the button help on row 3;
- * ramPagePal calls it before every page counter print (folder changes clear rows 0-24 of plane A) */
-ROMB_CODE void drawFilterTag(void)
+/* does the browser's list still hold the search results? */
+static int inResults(void)
+{
+    if (gSrCount && (DIR_CLUSTER() != gSrCluster || DIR_COUNT() != gSrCount || DIR_ENT(0)->dirsec != gSrFirst))
+        gSrCount = 0;                   /* back in a folder */
+    return gSrCount != 0;
+}
+
+/* "[*]" next to the page counter while the list holds search results (blank otherwise) and the button
+ * help on row 3, as wide as the list (columns 2-36); ramPagePal calls it before every page counter print
+ * (folder changes clear rows 0-24 of plane A) */
+void drawFilterTag(void)
 {
     char t[4] = {' ', ' ', ' ', 0};
-    if (gFilter && (DIR_CLUSTER() != gFilterCluster || DIR_COUNT() != gFilterCount))
-        gFilter = 0;                    /* another folder, or this one read again: unfiltered */
-    if (gFilter) {
+    if (inResults()) {
         t[0] = '[';
-        t[1] = gFilter;
+        t[1] = '*';
         t[2] = ']';
     }
     osPrint(PLANE_A, t, PAL2, 18, 26);
-    if (gBrowseMode)                    /* the help line under the banner ("Selecionar jogo" only) */
-        osPrintAl(PLANE_A, S_help, PAL2, 20, 3, ALIGN_CENTER);
+    if (gBrowseMode)                    /* "Selecionar jogo" only */
+        osPrint(PLANE_A, S_help, PAL2, 2, 3);
 }
 
 void browserBanner(void)
@@ -328,82 +331,8 @@ void browserBanner(void)
 }
 
 static void overlayTitle(void);
-static u32 filterApply(char letter);
 static u8 menu(const char *const *items, u32 n, u32 sel);
 static void info(const char *msg);
-static u32 extSearch(void);
-
-/* browser, C (ramBrowserC): pick a letter; only the files starting with it stay in the list (folders
- * always do). The browser's directory table is reordered in place and its count shortened; another
- * letter or "Todos" reads the folder again first. Returns 1 when the list changed (the cursor goes to
- * the top), 0 when cancelled; the browser redraws the page either way. */
-ROMC_CODE u32 browserFilter(void)
-{
-    static const char *const groups[] = {S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num, S_flt_all, S_flt_search};
-    static char letters[8][2];
-    const char *items[8];
-    char letter = 0;
-    u32 changed = 0;
-    u8 r;
-    int n, i;
-
-    gTitle = S_flt_title;
-    gOverlay = overlayTitle;
-    r = menu(groups, 7, 0);
-    if (r < 4) {
-        n = r == 3 ? 8 : 6;
-        for (i = 0; i < n; i++) {
-            letters[i][0] = 'A' + r * 6 + i;
-            items[i] = letters[i];
-        }
-        letter = 'A' + r * 6;
-        r = menu(items, n, 0);
-        letter += r;
-    } else if (r == 4) {
-        letter = '#';
-    }
-    gOverlay = 0;
-    if (r == 6)                         /* every folder: the search lives in the flash extension */
-        changed = extSearch();
-    else if (!(r & 0x40))               /* B: back to the list as it was */
-        changed = filterApply(letter);
-    osClear();                          /* the browser then redraws only the list and the footer */
-    drawWallpaper();
-    drawBanner(PLANE_B);
-    PAGE_CACHE = 0xFFFF;
-    return changed;
-}
-
-/* the whole folder again, then (unless "Todos") only the files starting with letter */
-__attribute__((noinline)) static u32 filterApply(char letter)
-{
-    int n, i, j;
-
-    if (osOpenDir(DIR_CLUSTER()))
-        return 1;
-    gFilter = letter;
-    if (!letter)
-        return 1;
-    n = DIR_COUNT();
-    for (i = j = 0; i < n; i++) {       /* the table keeps the first letters of each name: no SD reads */
-        DirEnt *e = DIR_ENT(i);
-        char c = e->key[0];
-        if (c >= 'a' && c <= 'z')
-            c -= 32;
-        if (e->isdir || (letter == '#' ? c < 'A' || c > 'Z' : c == letter))
-            DIR_ENT(j++) = e;
-    }
-    if (!j) {                           /* nothing with that letter: say so, keep the whole folder */
-        gFilter = 0;
-        osOpenDir(DIR_CLUSTER());
-        info(S_flt_none);
-        return 1;
-    }
-    *(u16 *)DIRHDR = j;
-    gFilterCount = j;
-    gFilterCluster = DIR_CLUSTER();
-    return 1;
-}
 
 /* called by osMenu instead of its screen clear (through the RAM guard) */
 void myMenuClear(void)
@@ -544,14 +473,14 @@ static int listAdd(int l, const Rec *r)
     return 1;
 }
 
-ROMB_CODE static void listClear(int l)
+static void listClear(int l)
 {
     scratchLoad();
     SCR_HDR->count[l] = 0;
     scratchCommit();
 }
 
-ROMB_CODE static void listRemove(int l, int idx)
+static void listRemove(int l, int idx)
 {
     ListEnt *list;
     int n, i;
@@ -603,8 +532,8 @@ static int entryValid(const ListEnt *le)
 /* ======================= diagnostics build: load timings + flash chip info ======================
  * The vblank counter stops while the OS programs the flash (VInt is disabled), so the Z80 is used
  * as an independent stopwatch: a 56 T-state loop incrementing a 32-bit counter in its RAM. */
-#define DSEC __attribute__((section(".diag"), noinline))
-#define DSRO __attribute__((section(".diagro")))
+#define DSEC __attribute__((noinline))
+#define DSRO
 #define Z80_BUSREQ (*(volatile u16 *)0xA11100)
 #define Z80_RESET (*(volatile u16 *)0xA11200)
 #define Z80_RAM ((volatile u8 *)0xA00000)
@@ -1072,7 +1001,7 @@ static int readSector0(Rec *r, void *dst)
  * The .ART file is streamed sector by sector through gArtBuf so the browser page cache survives.
  * abortable: give up as soon as a button is pressed (returns 0, nothing cached).
  */
-ROMB_CODE static int readArtFile(u16 tile, u16 *pal, int abortable)
+static int readArtFile(u16 tile, u16 *pal, int abortable)
 {
     int s, i;
     for (s = 0; s < 7; s++) {           /* 32-byte palette, then 108 tiles: 16 slots per sector */
@@ -1209,7 +1138,7 @@ static void hdrField(const char *label, u32 y, u32 off, int len, u32 x)
     osPrint(PLANE_A, i || !kanji ? b : S_ri_kanji, i ? PAL0 : PAL1, x, y);
 }
 
-ROMB_CODE __attribute__((noinline)) static void romInfo(void)
+__attribute__((noinline)) static void romInfo(void)
 {
     char b[16];
     clearWithBanner();
@@ -1318,53 +1247,6 @@ u32 fileMenuFromBrowser(u32 idx)
     return idx;
 }
 
-/* ---------------------------------------------------------------- flash extension (ext.c) */
-
-/* Code that does not fit in the OS image lives in flash block 0x40000 (never used by the OS), copied
- * there from /EDMD/V1EXT.BIN. The installer runs from RAM, in the stock main menu's place (0xFF528E,
- * replaced by myMainMenu): the OS copies it there at boot with the rest of the image. Its strings take
- * the stock main menu's ones (.deadstr, 0xFF96C8). */
-#define DEAD_CODE __attribute__((section(".dead.text"), noinline))
-#define EXT_ADDR 0x40000
-#define EXT_MAGIC 0x50544258            /* 'PTBX', then the build id */
-
-u32 srchMain(void);
-
-__attribute__((noinline)) static int extHdrOk(const u32 *h)
-{
-    return h[0] == EXT_MAGIC && h[1] == BUILD_ID;
-}
-
-/* /EDMD/V1EXT.BIN of this build -> flash 0x40000. Its first sector (the header) is written last, so a cut
- * install never looks complete. */
-DEAD_CODE static int extInstall(void)
-{
-    u32 keep = DIR_CLUSTER(), n, s;
-
-    if (!osFind(S_ext_path, &gTmp, 0) && !osOpen(&gTmp, 0) && !osRead(gSector0, 1) && extHdrOk((u32 *)gSector0)) {
-        n = (gTmp.size + 511) >> 9;
-        osPrint(PLANE_A, S_ext_install, PAL2, 1, 26);
-        osFlashErase(EXT_ADDR, 0x80, 1);
-        for (s = 1; s < n && !osRead(gArtBuf, 1); s++)
-            osFlashWrite(gArtBuf, EXT_ADDR + (s << 9), 1);
-        if (s == n)
-            osFlashWrite(gSector0, EXT_ADDR, 1);
-    }
-    DIR_CLUSTER() = keep;
-    if (extHdrOk((const u32 *)EXT_ADDR))
-        return 1;
-    info(S_ext_missing);
-    return 0;
-}
-
-/* browser C menu, "Buscar em todas as pastas" */
-static u32 extSearch(void)
-{
-    if (!extHdrOk((const u32 *)EXT_ADDR) && !extInstall())
-        return 0;
-    return srchMain();
-}
-
 /* ---------------------------------------------------------------- about / theme / main */
 
 void myAbout(void)
@@ -1384,11 +1266,9 @@ void myAbout(void)
         center(S_ab_dist, PAL1, 16);
         center((const char *)0x1C024, PAL0, 17);
         center((const char *)0x1C04C, PAL0, 18);
-#ifndef DIAG    /* the diagnostics build reuses the logo rows for its code */
-        osLoadTiles((const void *)0x1CC20, 0x80, 120, 0);
+        osLoadTiles((const void *)0x1CC20, 0x80, 120, 0);     /* the logo, in the OS image */
         osSetPal(3, (const void *)0x1C200);
         osFillSeq(PLANE_A, PAL3 | 0x80, 0, 20, 40, 3);
-#endif
     }
     center(S_press_key, PAL1, 26);
     waitKey();
@@ -1436,16 +1316,14 @@ void myMainMenu(void)
         case 4: randomGame(); break;
         case 5: osOptions(); break;
         case 6: osCheats(); break;
-        case 7: ramToolbox(); break;
+        case 7: osToolbox(); break;
         case 8: cycleTheme(); break;
         }
     }
 }
 
-/* boot hook (replaces the call to the FAT pointer init during OS init) */
-void myInit(void)
+static void myInit(void)
 {
-    osFatPtrInit();
     memset(bssStart, 0, bssEnd - bssStart);
     memcpy(ramStubRam, ramStubStart, ramStubEnd - ramStubStart);
     gRand = VBCOUNT ^ HVCOUNT;
@@ -1455,4 +1333,42 @@ void myInit(void)
     applyTheme();
 }
 
-#include "ext.c"
+#include "search.c"
+
+/* ---------------------------------------------------------------- extension entry */
+
+/* RAM patches of the OS (hooks, translated strings), written into patchTab (hooks.S) by the build: per
+ * patch u32 address, u16 length n, the n stock bytes, the n new bytes; length 0 ends it */
+extern const u8 patchTab[];
+
+static int patchOs(int write)
+{
+    const u8 *p = patchTab;
+    for (;;) {
+        u8 *dst = *(u8 *const *)p;
+        u16 n = *(const u16 *)(p + 4), i;
+        if (!n)
+            return 1;
+        p += 6;
+        for (i = 0; i < n; i++)
+            if (write)
+                dst[i] = p[n + i];
+            else if (dst[i] != p[i])
+                return 0;
+        p += 2 * n;
+    }
+}
+
+/* the loader's way in (at the main menu call of the OS boot); returns only when this extension does not
+ * fit the OS in RAM (the stock main menu runs then) */
+static u32 extMain(void)
+{
+    if (!patchOs(0))
+        return 0;
+    patchOs(1);
+    myInit();
+    myMainMenu();
+    return 0;
+}
+
+const ExtHdr extHdr __attribute__((section(".exthdr"), used)) = {EXT_MAGIC, EXT_ABI, BUILD_ID, 0, extMain};

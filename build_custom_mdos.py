@@ -1,5 +1,9 @@
+import re
 import struct
+import subprocess
+import sys
 import hashlib
+from pathlib import Path
 from capstone import *
 
 class Asm68k:
@@ -264,8 +268,30 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.21'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.22'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
+
+
+V3MOD = Path(__file__).resolve().parent / 'v3mod'
+
+
+def build_search(cls_banner):
+    """overlay page 2: v3mod/search.c compiled in WSL (rootless m68k toolchain, as the v1 build)"""
+    p = str(V3MOD / 'build.sh').replace('\\', '/')
+    r = subprocess.run(['wsl', '-d', 'Debian', '--', 'bash', f'/mnt/{p[0].lower()}{p[2:]}', hex(cls_banner)],
+                       capture_output=True, text=True)
+    if r.returncode:
+        print(r.stdout, r.stderr)
+        sys.exit('search overlay: compile failed')
+    data = (V3MOD / 'build' / 'search.bin').read_bytes()
+    assert len(data) <= 7 * 512, f'search overlay too large: {len(data)}'
+    lst = (V3MOD / 'build' / 'search.lst').read_text()
+    assert '.data' not in (V3MOD / 'build' / 'search.sections').read_text(), 'the overlay has no RAM'
+    bad = re.findall(r'\b(extbl|mulsl|mulul|divsl|divul|divsll|divull|bf[a-z]+|cas2?|chk2|cmp2|rtd|pack|unpk)\b', lst)
+    assert not bad, f'non-68000 instructions emitted: {set(bad)}'
+    rmw = re.findall(r'\b(?:clr|tst|not|negx?|bset|bclr|bchg|tas|addq|subq|or|and|eor)[bwl]?\b[^\n]*\bc0000[0-7]\b', lst)
+    assert not rmw, f'read-modify-write on a VDP port: {rmw}'
+    return data
 
 
 def build_custom_mdos():
@@ -276,15 +302,15 @@ def build_custom_mdos():
     rom = bytearray(orig)
 
     # =========================================================================
-    # Overlay: screens that run on their own live in MDOS.BIN right after the 32 KB the BIOS
-    # loads (file offset 0x8000, 7 sectors). ovlEnter (block 2) reads them into the box-art
-    # buffer 0xFFC800 when one is opened and jumps to its entry in this table. Overlay code
-    # must not load box art/banner (same buffer) and calls resident code with jsr (far away).
+    # Overlays: screens that run on their own live in MDOS.BIN after the 32 KB the BIOS loads, in
+    # pages of 7 sectors: page 1 at file offset 0x8000 (this one), page 2 at 0x8E00 (the search, C
+    # code from v3mod/). ovlEnter (block 2) reads a page into the box-art buffer 0xFFC800 when one of
+    # its screens is opened and jumps to its entry in the page's table. Overlay code must not load
+    # box art/banner (same buffer) and calls resident code with jsr (far away).
     # =========================================================================
     ovl = Asm68k(0xFFC800)
-    for name in ('ovl_romInfo', 'ovl_about', 'ovl_options', 'ovl_recent', 'ovl_fav', 'ovl_cheats',
-                 'ovl_filter'):
-        ovl.bra_w(name)                             # entry offsets 0, 4, 8, 12, 16, 20, 24
+    for name in ('ovl_romInfo', 'ovl_about', 'ovl_options', 'ovl_recent', 'ovl_fav', 'ovl_cheats'):
+        ovl.bra_w(name)                             # entry offsets 0, 4, 8, 12, 16, 20
 
     # =========================================================================
     # Block 1: Helper routines at 0xFF0B92..0xFF0BFA (104 bytes of dead romFileMenu)
@@ -337,8 +363,8 @@ def build_custom_mdos():
     blk2 = Asm68k(0xFF4F74)
     blk2.label('aboutScreen_ptbr')
     blk2.emit(0x7004)                               # moveq #4, d0 (overlay entry: about)
-    # ovlEnter(d0 = overlay entry offset): load the overlay and jump into it; the caller's
-    # return address and arguments stay as they are. Returns 0 when MDOS.BIN can't be read.
+    # ovlEnter(d0 = page - 1 << 8 | entry offset): load the overlay page and jump into the entry; the
+    # caller's return address and arguments stay as they are. Returns 0 when MDOS.BIN can't be read.
     blk2.label('ovlEnter')
     blk2.emit(0x3f00)                               # move.w d0, -(a7)
     blk2.emit(0x42a7)                               # clr.l -(a7)
@@ -347,7 +373,11 @@ def build_custom_mdos():
     blk2.emit(0x508f)                               # addq.l #8, a7
     blk2.emit(0x4a00)                               # tst.b d0
     blk2.b_s(0x66, 'oe_fail')
-    blk2.emit(0x4878, 0x0040)                       # pea.l $40.w (skip the 32 KB already in RAM)
+    blk2.emit(0x7000)                               # moveq #0, d0
+    blk2.emit(0x1017)                               # move.b (a7), d0 (page - 1)
+    blk2.emit(0xc0fc, 0x0007)                       # mulu.w #7, d0
+    blk2.emit(0x0640, 0x0040)                       # addi.w #$40, d0 (after the 32 KB already in RAM)
+    blk2.emit(0x2f00)                               # move.l d0, -(a7)
     blk2.emit(0x4eb9, 0x00ff, 0x21d8)               # jsr $ff21d8.l (fatSkipSectors)
     blk2.emit(0x588f)                               # addq.l #4, a7
     blk2.emit(0x4a00)                               # tst.b d0
@@ -360,6 +390,7 @@ def build_custom_mdos():
     blk2.emit(0x4a00)                               # tst.b d0
     blk2.b_s(0x66, 'oe_fail')
     blk2.emit(0x301f)                               # move.w (a7)+, d0
+    blk2.emit(0x0240, 0x00ff)                       # andi.w #$ff, d0
     blk2.emit(0x41f9, 0x00ff, 0xc800)               # lea.l $ffc800.l, a0
     blk2.emit(0x4ef0, 0x0000)                       # jmp (a0, d0.w)
     blk2.label('oe_fail')
@@ -551,8 +582,8 @@ def build_custom_mdos():
     ext.bsr_w('applyTheme')
     ext.emit(0x42b9, 0x00ff, 0xc5a0)                # clr.l $ffc5a0.l (L/R flags + cursor)
     ext.emit(0x4279, 0x00ff, 0xc5a4)                # clr.w $ffc5a4.l (banner, wallpaper: not tried yet)
-    ext.emit(0x42b9, 0x00ff, 0xc5a8)                # clr.l $ffc5a8.l (letter filter tag)
-    ext.emit(0x4239, 0x00ff, 0xc5ac)                # clr.b $ffc5ac.l
+    ext.emit(0x42b9, 0x00ff, 0xc5a8)                # clr.l $ffc5a8.l (search results tag)
+    ext.emit(0x4239, 0x00ff, 0xc5ac)                # clr.b $ffc5ac.l (search result for the browser)
     # Fixed VDP table addresses (the cart BIOS picks them; the v1 OS uses these): window 0xB000,
     # sprites 0xBC00, H scroll 0xB800, then zero the H scroll table and sprite 0. VRAM below 0xA000
     # is then free for the wallpaper tiles.
@@ -700,25 +731,41 @@ def build_custom_mdos():
     ext.emit(0x4e75)                                # rts
 
     # 3e. call_mainMenu_from_browser (jsr from the browser at 0xFF0FF0, C button)
+    # The browser keeps its folder in d6 (= dir header +2, else it reads the folder again), the parent
+    # (opened by B) in d5 and the cursor of each level on a stack at a4. The search (ffc5ac) asks for:
+    # 1 another list on the same level, 2 the results as a subfolder of the folder (B goes back to
+    # it), 3 back up to that folder (the search left the results with nothing found).
     ext.label('call_mainMenu_from_browser')
     ext.bsr_w('mainMenu_v2')
     ext.emit(0x4a00)                                # tst.b d0
     ext.b_s(0x66, 'cm_err')
-    ext.emit(0x4a39, 0x00ff, 0xc5ac)                # tst.b $ffc5ac.l (the letter filter changed the list?)
+    ext.emit(0x1039, 0x00ff, 0xc5ac)                # move.b $ffc5ac.l, d0 (the search changed the list?)
     ext.b_s(0x66, 'cm_new')
     ext.emit(0x4e75)                                # rts (back to the browser at 0xFF0FF6)
     ext.label('cm_new')
     ext.emit(0x4239, 0x00ff, 0xc5ac)                # clr.b $ffc5ac.l
     ext.emit(0x588f)                                # addq.l #4, a7
+    ext.emit(0x5500)                                # subq.b #2, d0
+    ext.b_s(0x65, 'cm_top')                         # bcs: 1
+    ext.b_s(0x66, 'cm_up')                          # bne: 3
+    ext.emit(0x38c4)                                # move.w d4, (a4)+ (2: B comes back to this cursor)
+    ext.emit(0x2a06)                                # move.l d6, d5 (B opens the folder)
+    ext.label('cm_top')
     ext.emit(0x7800)                                # moveq #0, d4 (cursor on the first entry)
+    ext.label('cm_draw')
     ext.emit(0x33fc, 0x0001, 0x00ff, 0x8008)        # move.w #1, $ff8008.l (full redraw)
     ext.emit(0x4ef9, 0x00ff, 0x0dba)                # jmp $ff0dba.l (browser: draw the page)
+    ext.label('cm_up')
+    ext.emit(0x3824)                                # move.w -(a4), d4 (the cursor it had)
+    ext.emit(0x2079, 0x00ff, 0xc46c)                # movea.l $ffc46c.l, a0
+    ext.emit(0x2a28, 0x0012)                        # move.l $12(a0), d5 (its parent)
+    ext.b_s(0x60, 'cm_draw')
     ext.label('cm_err')
     ext.emit(0x588f)                                # addq.l #4, a7
     ext.emit(0x4ef9, 0x00ff, 0x0f3a)                # jmp $ff0f3a.l
 
     # 3f. dirOpenHook: the browser reads a folder (jmp from 0xFF1C8C, ff1c8c's start): keep its cluster
-    # for the letter filter ($12 of the dir header changes with every file lookup) and drop the tag
+    # for the search and rfm_exit ($12 of the dir header changes with every file lookup) and drop the tag
     ext.label('dirOpenHook')
     ext.emit(0x23ef, 0x0004, 0x00ff, 0xc5b0)        # move.l 4(a7), $ffc5b0.l (the folder's cluster)
     ext.emit(0x4239, 0x00ff, 0xc5a8)                # clr.b $ffc5a8.l (tag "[X]" off)
@@ -727,16 +774,16 @@ def build_custom_mdos():
     ext.emit(0x4ef9, 0x00ff, 0x1c92)                # jmp $ff1c92.l
 
     # 3d. pagePal: before the browser prints "Pág. x de y" (jsr from 0xFF09C2, replacing tst.b $ffc478.l):
-    # palette 1 (gold), the filter tag and the button help line; draw_top_banner puts palette 0 back
+    # palette 1 (gold), the search tag and the button help line; draw_top_banner puts palette 0 back
     ext.label('pagePal')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w
     ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
     ext.emit(0x4878, 26)                            # pea.l 26.w (y)
     ext.emit(0x4878, 18)                            # pea.l 18.w (x)
-    ext.emit(0x4879, 0x00ff, 0xc5a8)                # pea.l $ffc5a8.l ("[X]" or empty)
+    ext.emit(0x4879, 0x00ff, 0xc5a8)                # pea.l $ffc5a8.l ("[*]" or empty)
     ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
     ext.emit(0x4878, 3)                             # pea.l 3.w (y: the help line under the banner)
-    ext.emit(0x4878, 1)                             # pea.l 1.w (x)
+    ext.emit(0x4878, 2)                             # pea.l 2.w (x: as wide as the list, columns 2-38)
     ext.pea_label('str_help')
     ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
     ext.emit(0x4fef, 0x001c)                        # lea.l $1c(a7), a7
@@ -1196,7 +1243,7 @@ def build_custom_mdos():
     ext.emit(0x7200)                                # moveq #0, d1
     ext.label('rfm_exit')
     # Our file lookups (cover, overlay) leave dir_hdr+2 on another folder; the browser compares it with
-    # its own and reads the folder again when they differ, which would drop the letter filter. The
+    # its own and reads the folder again when they differ, which would drop the search results. The
     # entry table itself is untouched, so put the browser's folder (kept by dirOpenHook) back.
     ext.emit(0x2079, 0x00ff, 0xc46c)                # movea.l $ffc46c.l, a0
     ext.emit(0x2179, 0x00ff, 0xc5b0, 0x0002)        # move.l $ffc5b0.l, 2(a0)
@@ -1236,13 +1283,24 @@ def build_custom_mdos():
     ext.emit(0x2448)                                # movea.l a0, a2
     ext.emit(0x4e90)                                # jsr (a0)
     ext.emit(0x588f)                                # addq.l #4, a7
-    ext.emit(0x4a42)                                # tst.w d2 (0 = Opções)
+    ext.emit(0x4a42)                                # tst.w d2 (0 = Buscar em todas as pastas)
+    ext.bne_w('mm_chk0')
+    ext.emit(0x303c, 0x0100)                        # move.w #$100, d0 (overlay page 2: search)
+    ext.jsr_label('ovlEnter')
+    ext.emit(0x4a40)                                # tst.w d0 (0 = cancelled)
+    ext.beq_w('mm_restore')
+    ext.emit(0x13c0, 0x00ff, 0xc5ac)                # move.b d0, $ffc5ac.l (what the browser does next)
+    ext.emit(0x7000)                                # moveq #0, d0
+    ext.bra_w('mm_exit')
+
+    ext.label('mm_chk0')
+    ext.emit(0x0c42, 0x0001)                        # cmpi.w #1, d2 (1 = Opções)
     ext.bne_w('mm_chk1')
     ext.emit(0x4eb9, 0x00ff, 0x49b6)                # jsr $ff49b6.l (optionsMenu_v2)
     ext.bra_w('mm_restore')
 
     ext.label('mm_chk1')
-    ext.emit(0x0c42, 0x0001)                        # cmpi.w #1, d2 (1 = Jogos Recentes)
+    ext.emit(0x0c42, 0x0002)                        # cmpi.w #2, d2 (2 = Jogos Recentes)
     ext.bne_w('mm_chk2')
     ext.bsr_w('recentlyPlayedMenu')
     ext.label('mm_chk_launch_err')
@@ -1252,19 +1310,19 @@ def build_custom_mdos():
     ext.bra_w('mm_exit')
 
     ext.label('mm_chk2')
-    ext.emit(0x0c42, 0x0002)                        # cmpi.w #2, d2 (2 = Favoritos)
+    ext.emit(0x0c42, 0x0003)                        # cmpi.w #3, d2 (3 = Favoritos)
     ext.bne_w('mm_chk3')
     ext.bsr_w('favoritesMenu')
     ext.bra_w('mm_chk_launch_err')
 
     ext.label('mm_chk3')
-    ext.emit(0x0c42, 0x0003)                        # cmpi.w #3, d2 (3 = Jogo Aleatório)
+    ext.emit(0x0c42, 0x0004)                        # cmpi.w #4, d2 (4 = Jogo Aleatório)
     ext.bne_w('mm_chk4')
     ext.jsr_label('playRandomGame')
     ext.bra_w('mm_chk_launch_err')
 
     ext.label('mm_chk4')
-    ext.emit(0x0c42, 0x0004)                        # cmpi.w #4, d2 (4 = Cheats)
+    ext.emit(0x0c42, 0x0005)                        # cmpi.w #5, d2 (5 = Cheats)
     ext.bne_w('mm_chk5')
     ext.emit(0x41ee, 0xee10)                        # lea.l -$11f0(a6), a0 (cheat tables: 16 longs,
     ext.emit(0x721b)                                # moveq #27, d1         16 words, 16 bytes)
@@ -1278,27 +1336,16 @@ def build_custom_mdos():
     ext.bra_w('mm_restore')
 
     ext.label('mm_chk5')
-    ext.emit(0x0c42, 0x0005)                        # cmpi.w #5, d2 (5 = Info do Sistema)
+    ext.emit(0x0c42, 0x0006)                        # cmpi.w #6, d2 (6 = Info do Sistema)
     ext.bne_w('mm_chk6')
     ext.emit(0x4eb9, 0x00ff, 0x4b54)                # jsr $ff4b54.l (deviceInfo)
     ext.bra_w('mm_restore')
 
     ext.label('mm_chk6')
-    ext.emit(0x0c42, 0x0006)                        # cmpi.w #6, d2 (6 = Créditos)
-    ext.bne_w('mm_chk7')
+    ext.emit(0x0c42, 0x0007)                        # cmpi.w #7, d2 (7 = Créditos)
+    ext.bne_w('mm_restore')
     ext.jsr_label('aboutScreen_ptbr')
     ext.bra_w('mm_restore')
-
-    ext.label('mm_chk7')
-    ext.emit(0x0c42, 0x0007)                        # cmpi.w #7, d2 (7 = Filtrar por letra)
-    ext.bne_w('mm_restore')
-    ext.emit(0x7018)                                # moveq #24, d0 (overlay: filter)
-    ext.jsr_label('ovlEnter')
-    ext.emit(0x4a40)                                # tst.w d0 (0 = cancelled)
-    ext.beq_w('mm_restore')
-    ext.emit(0x13fc, 0x0001, 0x00ff, 0xc5ac)        # move.b #1, $ffc5ac.l (browser: new list)
-    ext.emit(0x7000)                                # moveq #0, d0
-    ext.bra_w('mm_exit')
 
     ext.label('mm_restore')
     ext.emit(0x486e, 0xee80)                        # pea.l -$1180(a6)
@@ -1337,6 +1384,7 @@ def build_custom_mdos():
 
     emit_menu_table('menu_main_7', [
         'str_mm_title',
+        'str_mm_search',
         'str_opt_title',
         'str_recent_title',
         'str_fav_title',
@@ -1344,7 +1392,6 @@ def build_custom_mdos():
         'str_mm_cheats',
         'str_mm_devinfo',
         'str_mm_about',
-        'str_mm_filter',
     ])
 
     emit_menu_table('menu_rom_5', [
@@ -1503,9 +1550,9 @@ def build_custom_mdos():
     ext.label('str_mm_cheats')
     ext.emit_str(b'Cheats')
     ext.label('str_help')                           # browser, row 3 (pagePal)
-    ext.emit_str(b'A: arquivo  START: repetir  C: filtro')
-    ext.label('str_mm_filter')
-    ext.emit_str(b'Filtrar por Letra')
+    ext.emit_str(b'A: arquivo   START: repetir   C: menu')
+    ext.label('str_mm_search')
+    ext.emit_str(b'Buscar em Todas as Pastas')
     ext.label('str_mm_devinfo')
     ext.emit_str(b'Info Sistema')
     ext.label('str_mm_about')
@@ -2041,146 +2088,7 @@ def build_custom_mdos():
     ovl.emit(0x4e5e)                                # unlk a6
     ovl.emit(0x4e75)                                # rts
 
-    # Filtrar por letra: group menu, then the letter; the folder is read again (its cluster was kept
-    # by dirOpenHook) and only the files starting with the letter stay in its entry table (folders
-    # always do). Returns d0 = 1 when the list changed (call_mainMenu_from_browser redraws it from
-    # the top), 0 when cancelled.
-    ovl.label('ovl_filter')
-    ovl.emit(0x48e7, 0x3e30)                        # movem.l d2-d6/a2-a3, -(a7)
-    ovl.emit(0x42a7)                                # clr.l -(a7)
-    ovl.emit(0x4878, 0x0006)                        # pea.l $6.w
-    ovl.pea_label('flt_groups')
-    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
-    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ovl.emit(0x0c40, 0xffff)                        # cmpi.w #$ffff, d0 (B)
-    ovl.beq_w('of_cancel')
-    ovl.emit(0x3400)                                # move.w d0, d2 (group)
-    ovl.emit(0x7600)                                # moveq #0, d3 (letter: none = Todos)
-    ovl.emit(0x0c42, 0x0005)                        # cmpi.w #5, d2
-    ovl.beq_w('of_apply')
-    ovl.emit(0x7623)                                # moveq #'#', d3 (0-9 and others)
-    ovl.emit(0x0c42, 0x0004)                        # cmpi.w #4, d2
-    ovl.beq_w('of_apply')
-    ovl.emit(0x3002)                                # move.w d2, d0
-    ovl.emit(0xe748)                                # lsl.w #3, d0 (8 bytes per group: menu, count)
-    ovl.lea_label(1, 'flt_subs')
-    ovl.emit(0xd2c0)                                # adda.w d0, a1
-    ovl.emit(0x42a7)                                # clr.l -(a7)
-    ovl.emit(0x2f29, 0x0004)                        # move.l 4(a1), -(a7) (count)
-    ovl.emit(0x2f11)                                # move.l (a1), -(a7) (menu)
-    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw)
-    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ovl.emit(0x0c40, 0xffff)                        # cmpi.w #$ffff, d0
-    ovl.beq_w('of_cancel')
-    ovl.emit(0x3602)                                # move.w d2, d3
-    ovl.emit(0xc6fc, 0x0006)                        # mulu.w #6, d3
-    ovl.emit(0xd640)                                # add.w d0, d3
-    ovl.emit(0x0643, 0x0041)                        # addi.w #'A', d3
-    ovl.label('of_apply')
-    ovl.emit(0x2f39, 0x00ff, 0xc5b0)                # move.l $ffc5b0.l, -(a7) (this folder's cluster)
-    ovl.emit(0x4eb9, 0x00ff, 0x1c8c)                # jsr $ff1c8c.l (read it again: whole list, tag off)
-    ovl.emit(0x588f)                                # addq.l #4, a7
-    ovl.emit(0x4a00)                                # tst.b d0
-    ovl.bne_w('of_done')
-    ovl.emit(0x4a03)                                # tst.b d3 (Todos?)
-    ovl.beq_w('of_done')
-    ovl.emit(0x2479, 0x00ff, 0xc46c)                # movea.l $ffc46c.l, a2
-    ovl.emit(0x47ea, 0x3016)                        # lea.l $3016(a2), a3 (entry pointers)
-    ovl.emit(0x3812)                                # move.w (a2), d4 (entries)
-    ovl.emit(0x7400)                                # moveq #0, d2 (read index)
-    ovl.emit(0x7a00)                                # moveq #0, d5 (write index)
-    ovl.label('of_loop')
-    ovl.emit(0xb444)                                # cmp.w d4, d2
-    ovl.bcc_w('of_end')
-    ovl.emit(0x7000, 0x3002, 0xe588)                # moveq #0, d0 ; move.w d2, d0 ; lsl.l #2, d0
-    ovl.emit(0x2c33, 0x0800)                        # move.l (a3, d0.l), d6 (entry)
-    ovl.emit(0x2046)                                # movea.l d6, a0
-    ovl.emit(0x4a68, 0x000a)                        # tst.w $a(a0) (folder: keep)
-    ovl.bne_w('of_keep')
-    ovl.emit(0x4879, 0x00ff, 0xd600)                # pea.l $ffd600.l
-    ovl.emit(0x2f06)                                # move.l d6, -(a7)
-    ovl.emit(0x4eb9, 0x00ff, 0x2872)                # jsr $ff2872.l (fatGetRec)
-    ovl.emit(0x508f)                                # addq.l #8, a7
-    ovl.emit(0x4a00)                                # tst.b d0
-    ovl.bne_w('of_next')
-    ovl.emit(0x1039, 0x00ff, 0xd60e)                # move.b $ffd60e.l, d0 (first letter of the name)
-    ovl.emit(0x0c00, 0x0061)                        # cmpi.b #'a', d0
-    ovl.b_s(0x65, 'of_up')
-    ovl.emit(0x0c00, 0x007a)                        # cmpi.b #'z', d0
-    ovl.b_s(0x62, 'of_up')
-    ovl.emit(0x0400, 0x0020)                        # subi.b #32, d0
-    ovl.label('of_up')
-    ovl.emit(0x0c03, 0x0023)                        # cmpi.b #'#', d3
-    ovl.b_s(0x66, 'of_cmp')
-    ovl.emit(0x0c00, 0x0041)                        # cmpi.b #'A', d0 (others: not A-Z)
-    ovl.b_s(0x65, 'of_keep')
-    ovl.emit(0x0c00, 0x005a)                        # cmpi.b #'Z', d0
-    ovl.b_s(0x62, 'of_keep')
-    ovl.b_s(0x60, 'of_next')
-    ovl.label('of_cmp')
-    ovl.emit(0xb003)                                # cmp.b d3, d0
-    ovl.b_s(0x66, 'of_next')
-    ovl.label('of_keep')
-    ovl.emit(0x7000, 0x3005, 0xe588)                # moveq #0, d0 ; move.w d5, d0 ; lsl.l #2, d0
-    ovl.emit(0x2786, 0x0800)                        # move.l d6, (a3, d0.l)
-    ovl.emit(0x5245)                                # addq.w #1, d5
-    ovl.label('of_next')
-    ovl.emit(0x5242)                                # addq.w #1, d2
-    ovl.bra_w('of_loop')
-    ovl.label('of_end')
-    ovl.emit(0x4a45)                                # tst.w d5 (nothing with that letter?)
-    ovl.b_s(0x66, 'of_some')
-    ovl.emit(0x2f39, 0x00ff, 0xc5b0)                # move.l $ffc5b0.l, -(a7)
-    ovl.emit(0x4eb9, 0x00ff, 0x1c8c)                # jsr $ff1c8c.l (whole folder again)
-    ovl.emit(0x588f)                                # addq.l #4, a7
-    ovl.emit(0x42a7)                                # clr.l -(a7)
-    ovl.emit(0x4878, 0x0001)                        # pea.l $1.w
-    ovl.pea_label('flt_none')
-    ovl.emit(0x4eb9, 0x00ff, 0x4834)                # jsr $ff4834.l (menuDraw: message)
-    ovl.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
-    ovl.bra_w('of_done')
-    ovl.label('of_some')
-    ovl.emit(0x3485)                                # move.w d5, (a2) (entries: only the matches)
-    ovl.emit(0x13fc, 0x005b, 0x00ff, 0xc5a8)        # move.b #'[', $ffc5a8.l
-    ovl.emit(0x13c3, 0x00ff, 0xc5a9)                # move.b d3, $ffc5a9.l
-    ovl.emit(0x13fc, 0x005d, 0x00ff, 0xc5aa)        # move.b #']', $ffc5aa.l
-    ovl.emit(0x4239, 0x00ff, 0xc5ab)                # clr.b $ffc5ab.l
-    ovl.label('of_done')
-    ovl.emit(0x7001)                                # moveq #1, d0
-    ovl.b_s(0x60, 'of_ret')
-    ovl.label('of_cancel')
-    ovl.emit(0x7000)                                # moveq #0, d0
-    ovl.label('of_ret')
-    ovl.emit(0x4cdf, 0x0c7c)                        # movem.l (a7)+, d2-d6/a2-a3
-    ovl.emit(0x4e75)                                # rts
-
     ovl_code_end = len(ovl.buf)
-
-    # letter filter menus
-    def ovl_menu(label, names):
-        ovl.label(label)
-        base = len(ovl.buf)
-        ovl.emit_l(*([0] * len(names)))
-        for k, n in enumerate(names):
-            ovl.fixups.append((base + 4 * k, n, 'abs32'))
-    ovl_menu('flt_groups', ['str_flt_title', 'str_flt_af', 'str_flt_gl', 'str_flt_mr', 'str_flt_sz',
-                            'str_flt_num', 'str_flt_all'])
-    ovl_menu('flt_none', ['str_flt_title', 'str_flt_none'])
-    for g, (first, n) in enumerate((('A', 6), ('G', 6), ('M', 6), ('S', 8))):
-        ovl_menu(f'flt_g{g}', ['str_flt_title'] + [f'str_flt_{chr(ord(first) + k)}' for k in range(n)])
-    ovl.label('flt_subs')                           # per group: menu, item count
-    for g, n in enumerate((6, 6, 6, 8)):
-        base = len(ovl.buf)
-        ovl.emit_l(0, n)
-        ovl.fixups.append((base, f'flt_g{g}', 'abs32'))
-    for label, text in (('str_flt_title', b'Filtrar por Letra'), ('str_flt_af', b'A - F'), ('str_flt_gl', b'G - L'),
-                        ('str_flt_mr', b'M - R'), ('str_flt_sz', b'S - Z'), ('str_flt_num', b'0 - 9 e Outros'),
-                        ('str_flt_all', b'Todos (sem Filtro)'), ('str_flt_none', b'Nenhum Jogo com essa Letra')):
-        ovl.label(label)
-        ovl.emit_str(text)
-    for k in range(26):
-        ovl.label(f'str_flt_{chr(65 + k)}')
-        ovl.emit_str(bytes([65 + k]))
 
     # ---- overlay data
     ovl.label('about_table')
@@ -2315,6 +2223,10 @@ def build_custom_mdos():
     assert len(ovl.buf) <= 7 * 512, f"overlay too large: {len(ovl.buf)}"
     assert rom[0x8000:0x8000 + len(ovl.buf)] == bytes(len(ovl.buf))
     rom[0x8000:0x8000 + len(ovl.buf)] = ovl.buf
+
+    search = build_search(all_labels['clsBanner'])
+    assert rom[0x8E00:0x8E00 + 7 * 512] == bytes(7 * 512)
+    rom[0x8E00:0x8E00 + len(search)] = search
 
     assert 0x6E48 + len(ext.buf) <= 0x8000, f"Extension exceeds 32KB limit: 0x{0x6E48 + len(ext.buf):04X}"
     rom[0x6E48:0x6E48 + len(ext.buf)] = ext.buf
@@ -2537,7 +2449,7 @@ def build_custom_mdos():
     print(f"  blk3 (0xFF50BC):  {len(blk3.buf)} / 216 bytes")
     print(f"  opt  (0xFF49B6):  {len(opt_asm.buf)} / 414 bytes")
     print(f"  blkA (0xFF6854):  {len(blkA.buf)} / 124 bytes   blkB (0xFF6B08):  {len(blkB.buf)} / 222 bytes")
-    print(f"  ovl  (file 0x8000 -> 0xFFC800): {len(ovl.buf)} / 3584 bytes")
+    print(f"  ovl  (file 0x8000 -> 0xFFC800): {len(ovl.buf)} / 3584 bytes, search (file 0x8E00): {len(search)} / 3584 bytes")
     print(f"  ext  (0xFF6E48):  0xFF6E48..0xFF{0x6E48 + used - 1:04X} ({used} bytes used, {free} bytes free)")
     print(f"  SHA-256: {sha}")
     print("  100% verified: 0 clone-check instructions, all m68k code blocks disassembled cleanly!")

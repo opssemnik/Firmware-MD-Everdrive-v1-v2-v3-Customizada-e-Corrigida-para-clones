@@ -1,63 +1,31 @@
 /*
- * RAM guard stubs + browser hook.
- *
- * Every patched call site in the RAM-resident OS jumps to a stub in RAM first. The stub checks
- * the build signature at the end of the OS flash image (0x1FFF8) and only then enters the new
- * code in flash; otherwise it runs the stock routine. This keeps the OS usable while the
- * "update OS" tool has the flash half-written (it returns to the toolbox on errors).
+ * Hook glue. The patched call sites of the RAM-resident OS (patch table, see extMain) jump to these
+ * stubs, copied to RAM by myInit, which enter the C code in the flash extension. The extension block
+ * is only ever rewritten by the loader at boot, so it is always there (also while "gravar OS" rewrites
+ * the OS image).
  */
-
-#define SIG_ADDR 0x1FFF8
-#define SIG_MAGIC 0x50544252    /* 'PTBR' */
-
-.macro CHECK fail
-    cmpi.l  #SIG_MAGIC, (SIG_ADDR).l
-    bne.s   \fail
-    cmpi.l  #BUILD_ID, (SIG_ADDR + 4).l
-    bne.s   \fail
-.endm
 
     .section .ramstub, "ax"
 
     .globl  ramMenuClear
 ramMenuClear:                   /* osMenu screen clear (was jsr $ff7fb2) */
-    CHECK   1f
     jmp     myMenuClear
-1:  jmp     0xFF7FB2
 
     .globl  ramSave
 ramSave:                        /* settings save entry (stock prologue overwritten by jmp) */
-    CHECK   1f
     jmp     mySaveSettings
-1:  lea     -0x200(%sp), %sp
-    move.l  %d2, -(%sp)
-    jmp     0xFF5C84
 
     .globl  ramAbout
 ramAbout:                       /* toolbox "about" (was bsr.w $ff7342) */
-    CHECK   1f
     jmp     myAbout
-1:  jmp     0xFF7342
 
     .globl  ramAHook
 ramAHook:                       /* browser, A pressed: jsr from $ff6640, a0 = entry */
-    CHECK   1f
     jmp     aHook
-1:  tst.w   10(%a0)             /* stock: file -> continue at $ff6716 */
-    bne.s   2f
-    addq.l  #4, %sp
-    jmp     0xFF6716
-2:  rts                         /* directory -> back to $ff6646 */
 
     .globl  ramIdle
 ramIdle:                        /* browser waiting for input (was a PAD polling loop at $ff660e) */
-    CHECK   1f
     jmp     browseIdle
-1:  tst.w   (0xFFE30C).l        /* stock: spin until a button, resetting the repeat counter */
-    bne.s   2f
-    clr.w   %d5
-    bra.s   1b
-2:  rts
 
     .globl  ramCheatApply
 ramCheatApply:                  /* GG code list, START: apply (was bsr.w $ff3d1c; addq.l #4,sp at $ff3fec) */
@@ -66,7 +34,6 @@ ramCheatApply:                  /* GG code list, START: apply (was bsr.w $ff3d1c
     addq.l  #4, %sp
     movea.l (%sp)+, %a0
     addq.l  #4, %sp             /* the displaced addq: drop the caller's argument */
-    CHECK   1f
     tst.b   gCheatPlay          /* opened by "Jogar com cheats": play now */
     beq.s   1f
     clr.l   -(%sp)
@@ -152,75 +119,79 @@ ramEraseWait:
     dbra    %d7, 6b
     rts
 
+/* The browser's locals (sp right after its button checks): folder clusters per depth d7 at $ac(sp),
+ * cursor per depth at $2c(sp) - what A on a folder saves before d7 goes up, and B reads back. */
     .globl  ramBrowserC
 ramBrowserC:                    /* browser, after the UP/DOWN/RIGHT checks (was move.w $ffe30c,d0 at $ff693e) */
     move.w  (0xFFE30C).l, %d0
-    btst    #5, %d0             /* C: letter filter */
+    btst    #5, %d0             /* C: search in every folder */
     beq.s   1f
-    CHECK   1f
     tst.b   gBrowseMode         /* "Selecionar jogo" only, not the SRAM tools browser */
     beq.s   1f
     movem.l %d1-%d7/%a0-%a6, -(%sp)
-    jsr     browserFilter
+    jsr     browserSearch
     movem.l (%sp)+, %d1-%d7/%a0-%a6
     addq.l  #4, %sp             /* leave the button checks */
-    tst.l   %d0
-    beq.s   2f
-    moveq   #0, %d3             /* new list: cursor on its first entry */
-2:  jmp     0xFF64B4            /* redraw the page (not $ff6478: it would forget the folder depth) */
+    tst.l   %d0                 /* 0: cancelled */
+    beq.s   3f
+    subq.l  #2, %d0
+    bcs.s   2f                  /* 1: another list, same level */
+    bne.s   4f                  /* 3: back up to the folder the search started in */
+    cmpi.w  #62, %d7            /* 2: results, entered like a subfolder of the folder */
+    bcc.s   2f
+    move.w  %d7, %d0
+    add.w   %d0, %d0
+    lea     0x2C(%sp), %a0
+    move.w  %d3, (%a0, %d0.w)   /* B comes back to the same cursor */
+    add.w   %d0, %d0
+    lea     0xAC(%sp), %a0
+    movea.l (0xFFCC7C).l, %a1
+    move.l  2(%a1), (%a0, %d0.w)
+    addq.w  #1, %d7
+2:  moveq   #0, %d3             /* new list: cursor on its first entry */
+3:  jmp     0xFF64B4            /* redraw the page (not $ff6478: it would forget the folder depth) */
+4:  tst.w   %d7
+    beq.s   2b
+    subq.w  #1, %d7
+    move.w  %d7, %d0
+    add.w   %d0, %d0
+    lea     0x2C(%sp), %a0
+    move.w  (%a0, %d0.w), %d3   /* the cursor it had */
+    bra.s   3b
 1:  move.w  (0xFFE30C).l, %d0
     rts
 
     .globl  ramPagePal
 ramPagePal:                     /* browser, before the page counter (was lea $ff8ed0,a3 at $ff64f4): every */
     lea     0xFF8ED0, %a3       /* page redraw passes here; d4 = palette 2 (gold) is pushed as the colour */
-    CHECK   1f                  /* of the three "pág: x / y" prints; the letter filter tag goes next to it */
-    movem.l %d0-%d1/%a0-%a1, -(%sp)
+    movem.l %d0-%d1/%a0-%a1, -(%sp)     /* of the three "pág: x / y" prints; the search tag goes next to it */
     jsr     drawFilterTag
     movem.l (%sp)+, %d0-%d1/%a0-%a1
-1:  move.l  #0x4000, %d4
+    move.l  #0x4000, %d4
     rts
 
     .globl  ramBrowserBanner
 ramBrowserBanner:               /* browser full redraw (was move.b #1,$ffe306 at $ff64a8) */
     move.b  #1, (0xFFE306).l
-    CHECK   1f
     jmp     browserBanner
-1:  rts
 
 #ifdef DIAG
-/* timing probes: entry of the status print, flash erase, flash write and checksum copy.
- * Fallbacks run the displaced stock instructions and continue in the stock routine. */
+/* timing probes: entry of the status print, flash erase, flash write and checksum copy */
     .globl  ramDStatus
 ramDStatus:
-    CHECK   1f
     jmp     dStatus
-1:  move.b  (0xFFE306).l, %d0
-    jmp     0xFF7F80
 
     .globl  ramDErase
 ramDErase:
-    CHECK   1f
     jmp     dErase
-1:  movem.l %d2-%d3/%a2, -(%sp)
-    movea.l 0x10(%sp), %a2
-    jmp     0xFF559A
 
     .globl  ramDWrite
 ramDWrite:
-    CHECK   1f
     jmp     dWrite
-1:  movem.l %d2-%d4/%a2, -(%sp)
-    move.l  0x18(%sp), %d2
-    jmp     0xFF57D8
 
     .globl  ramDCheck
 ramDCheck:
-    CHECK   1f
     jmp     dCheck
-1:  lea     -0x1c(%sp), %sp
-    movem.l %d2-%d5/%a2-%a3, -(%sp)
-    jmp     0xFF409C
 
 /* ramFlashProbe(u16 *out): out[0..3] = autoselect IDs (words 0, 1, 0xE, 0xF),
  * out[4..51] = CFI words 0x10..0x3F. Runs from RAM: the flash array is unreadable meanwhile. */
@@ -272,15 +243,13 @@ ramMenuLR:
 1:  andi.b  #0xD0, %d0
     rts
 
-    .globl  ramToolbox
-ramToolbox:                     /* toolbox; never return into a rewritten flash */
-    jsr     0xFF7B68
-    cmpi.l  #SIG_MAGIC, (SIG_ADDR).l
-    bne.w   ramToolbox
-    cmpi.l  #BUILD_ID, (SIG_ADDR + 4).l
-    bne.w   ramToolbox
-    rts
 
+/* the table of patches to the RAM-resident OS (see extMain), filled in by the build */
+    .section .patch, "a"
+    .globl  patchTab
+    .balign 4
+patchTab:
+    .space  0x1000                  /* PATCH_MAX */
 
     .text
 

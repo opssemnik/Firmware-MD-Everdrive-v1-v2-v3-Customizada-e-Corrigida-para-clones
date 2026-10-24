@@ -1,11 +1,16 @@
 """
-Builds OS-V38-PTBR.BIN for the EverDrive-MD v1: stock OS v38 + RetroGamer POA distributor logo
-+ the PT-BR mod features of MDOS.ptbr.BIN (translation, accents, banner, recent games, favourites,
-random game, file menu with box art, ROM info, themes, credits).
+Builds the EverDrive-MD v1 PT-BR mod (translation, accents, banner, recent games, favourites, random
+game, file menu with box art, ROM info, themes, credits, search):
 
-New code lives in v1mod/ (C + asm) and is compiled inside WSL Debian with the rootless m68k
-toolchain in ~/m68k/root. The OS file is mapped at cart 0x10000 and copied to RAM 0xFF0000;
-the new code runs straight from flash, the stock OS keeps running from RAM.
+  OS-V38-PTBR.BIN  stock OS v38 + RetroGamer POA distributor logo + the loader (v1mod/loader.c), flashed
+                   once with "gravar OS". It changes only when the loader does.
+  V1EXT.BIN        the extension (/EDMD/V1EXT.BIN on the card): all the mod code and data plus the table
+                   of patches to the RAM-resident OS. The loader copies it to flash 0x40000 at boot when
+                   it changed, then runs it from there.
+
+The code lives in v1mod/ (C + asm) and is compiled inside WSL Debian with the rootless m68k toolchain
+in ~/m68k/root. The OS file is mapped at cart 0x10000 and copied to RAM 0xFF0000 at boot; the stock OS
+keeps running from RAM, the new code runs straight from flash.
 """
 import re
 import struct
@@ -21,7 +26,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.21'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.22'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     # /EDMD/V1EXT.BIN on the SD card
@@ -29,10 +34,9 @@ EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     #
 RAM = 0xFF0000          # RAM address of file offset 0
 CART = 0x10000          # cart address of file offset 0
 CODE_START, CODE_END = 0x10DC, 0x93DC   # RAM-resident code (font data precedes it)
-DEAD = (0xFF528E, 0xFF53D4)             # stock main menu (replaced by myMainMenu): the .dead section
-DEADSTR = (0xFF96C8, 0xFF970E)          # its item + error strings: .deadstr
-DEAD_STRINGS = ('S_ext_path', 'S_ext_missing', 'S_ext_install')
 EXT_ADDR, EXT_SIZE = 0x40000, 0x10000   # flash extension block
+EXT_ABI = 1                             # = os.h
+PATCH_MAX = 0x1000                      # = os.h
 SIG_OFF = 0xFFF8
 
 GLYPHS = 'áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ'
@@ -58,19 +62,12 @@ C_STRINGS = {
     'S_fm_load_start': 'Carregar e jogar',
     'S_fm_load_only': 'Só carregar',
     'S_fm_cheats': 'Jogar com cheats',
-    'S_help': 'A: menu  START: jogar  C: filtro/busca',
-    'S_flt_title': 'Filtrar ou buscar',
-    'S_flt_search': 'Buscar em todas as pastas',
-    'S_ext_path': '/EDMD/V1EXT.BIN',
-    'S_ext_missing': 'Falta /EDMD/V1EXT.BIN',
-    'S_ext_install': 'Instalando a extensão...',
+    'S_help': 'A: menu   START: jogar    C: buscar',     # columns 2-36, as wide as the list
     'S_flt_af': 'A - F',
     'S_flt_gl': 'G - L',
     'S_flt_mr': 'M - R',
     'S_flt_sz': 'S - Z',
     'S_flt_num': '0 - 9 e outros',
-    'S_flt_all': 'Todos (sem filtro)',
-    'S_flt_none': 'Nenhum jogo com essa letra',
     'S_fm_add_fav': 'Adicionar aos favoritos',
     'S_fm_rom_info': 'Info da ROM',
     'S_back': 'Voltar',
@@ -120,8 +117,8 @@ C_STRINGS = {
     'S_ab_dist': 'distribuído por:',
 }
 
-# strings of the flash extension (ext.c, /EDMD/V1EXT.BIN)
-EXT_STRINGS = {
+# search (search.c)
+C_STRINGS.update({
     'SX_title': 'Buscar em todas as pastas',
     'SX_by_name': 'Por nome (digitar)',
     'SX_kb_title': 'Buscar por nome',
@@ -134,7 +131,7 @@ EXT_STRINGS = {
     'SX_folders': 'Pastas lidas: ',
     'SX_found': 'Encontrados:  ',
     'SX_full': 'Muitos resultados: só os 512 primeiros',
-}
+})
 
 # ---------------------------------------------------------------- stock strings moved to flash
 OS_REPOINT = {
@@ -312,28 +309,21 @@ def c_bytes(b):
 
 
 def gen_sources(glyphs, banner):
-    """gen.h / gen.c: glyph + banner data and all strings, spread over the free flash regions."""
+    """gen.h / gen.c: glyph + banner data and all strings (all in the extension)."""
     strings = {name: enc(t) + b'\0' for name, t in C_STRINGS.items()}
     strings['S_banner'] = bytes(range(BANNER_BASE, BANNER_BASE + len(banner) // 16)) + b'\0'
     for addr, t in OS_REPOINT.items():
         strings[f'O_{addr:06X}'] = enc(t) + b'\0'
-    room = {'.strc': 0xA00, '.strb': 0x7A0 - 8 * len(glyphs) - len(banner) - 4}
     h = ['#ifndef GEN_H', '#define GEN_H', f'#define NGLYPH {len(glyphs)}',
          f'#define GLYPH_TILE 0x{GLYPH_BASE + 0x4E0:x}', f'#define BANNER_TILE 0x{BANNER_BASE + 0x4E0:x}',
          f'#define NBANNER {len(banner) // 16}',
          'extern const unsigned char glyph1bpp[];', 'extern const unsigned char banner2bpp[];']
     c = ['#include "gen.h"',
-         f'const unsigned char glyph1bpp[] __attribute__((section(".strb"))) = {{{c_bytes(sum(glyphs, []))}}};',
-         f'const unsigned char banner2bpp[] __attribute__((section(".strb"))) = {{{c_bytes(banner)}}};']
-    for name, data in sorted(strings.items(), key=lambda kv: -len(kv[1])):
-        sec = '.deadstr' if name in DEAD_STRINGS else             next((s for s, left in room.items() if left >= len(data) + 1), '.rodata.gen')
-        if sec in room:
-            room[sec] -= len(data) + 1
+         f'const unsigned char glyph1bpp[] = {{{c_bytes(sum(glyphs, []))}}};',
+         f'const unsigned char banner2bpp[] = {{{c_bytes(banner)}}};']
+    for name, data in strings.items():
         h.append(f'extern const char {name}[];')
-        c.append(f'const char {name}[] __attribute__((section("{sec}"))) = {{{c_bytes(data)}}};')
-    for name, t in EXT_STRINGS.items():
-        h.append(f'extern const char {name}[];')
-        c.append(f'const char {name}[] __attribute__((section(".ext.ro"))) = {{{c_bytes(enc(t) + bytes(1))}}};')
+        c.append(f'const char {name}[] = {{{c_bytes(data)}}};')
     h.append('#endif')
     BUILD.mkdir(exist_ok=True)
     (BUILD / 'gen.h').write_text('\n'.join(h) + '\n')
@@ -384,47 +374,17 @@ def main():
     banner = build_banner(stock)
     gen_sources(glyphs, banner)
 
-    src = b''.join((MOD / f).read_bytes() for f in ('os.h', 'mod.c', 'hooks.S', 'link.ld'))
+    src = b''.join((MOD / f).read_bytes() for f in ('os.h', 'loader.c', 'mod.c', 'search.c', 'hooks.S', 'link.ld', 'build.sh'))
     src += (BUILD / 'gen.c').read_bytes()
     src += Path(__file__).read_bytes() + (b'DIAG' if DIAG else b'')
     build_id = zlib.crc32(src) & 0x7FFFFFFF | 1
 
-    # 3. compile + place
+    # 3. compile; the loader goes into the OS image
     syms, secs = compile_mod(build_id)
-    assert secs.get('.data', (0, 0, 0))[1] == 0, '.data must be empty (nothing copies it)'
-    placed = []
-    for name in ('.text', '.ramstub', '.strb', '.strc', '.diag', '.dead', '.deadstr'):
-        if name not in secs or not secs[name][1]:
-            assert name == '.diag' and not DIAG, f'missing section {name}'
-            continue
-        lma, size, vma = secs[name]
-        data = (BUILD / f'{name[1:]}.bin').read_bytes()
-        assert len(data) == size
-        if name in ('.dead', '.deadstr'):   # RAM code/strings inside the OS image (copied to RAM at boot)
-            lo, hi = DEAD if name == '.dead' else DEADSTR
-            assert lo <= lma and lma + size <= hi
-            off = lma - RAM
-        else:
-            off = lma - CART
-        assert 0 <= off and off + size <= SIG_OFF
-        rom[off:off + size] = data
-        placed.append((name, lma, size))
-    # the extension: header 'PTBX' + build id, padded to whole sectors (extInstall copies sectors)
-    ext = (BUILD / 'ext.bin').read_bytes()
-    assert secs['.ext'][0] == EXT_ADDR and len(ext) == secs['.ext'][1] <= EXT_SIZE
-    assert ext[:8] == b'PTBX' + struct.pack('>I', build_id)
-    ext += b'\xff' * (-len(ext) % 512)
-    # ext.c code must stay in the extension (the base enters it only through extSearch) and nothing
-    # of the base may land there
-    ext_src = (MOD / 'ext.c').read_text()
-    for n, a in syms.items():
-        in_ext = EXT_ADDR <= a < EXT_ADDR + EXT_SIZE
-        base_name = n.split('.')[0]
-        if re.search(r'EXT_CODE[^(]*\b' + re.escape(base_name) + r'\(', ext_src):
-            assert in_ext, f'{n} (ext.c) is outside the extension'
-        elif in_ext:
-            assert n.startswith('SX_') or base_name in re.findall(r'\w+', ext_src), f'unexpected symbol in the extension: {n}'
-    rom[SIG_OFF:SIG_OFF + 8] = b'PTBR' + struct.pack('>I', build_id)
+    lma, size, vma = secs['.base']
+    base = (BUILD / 'base.bin').read_bytes()
+    assert len(base) == size and lma == CART + 0xE400 and 0xE400 + size <= SIG_OFF
+    rom[0xE400:0xE400 + size] = base
     lst = (BUILD / 'mod.lst').read_text()
     bad = re.findall(r'\b(extbl|mulsl|mulul|divsl|divul|divsll|divull|bf[a-z]+|cas2?|chk2|cmp2|rtd|pack|unpk)\b', lst)
     assert not bad, f'non-68000 instructions emitted: {set(bad)}'
@@ -432,16 +392,26 @@ def main():
     # VDP is set up for writing hangs the real console (the v3 1.14/1.15 black screen)
     rmw = re.findall(r'\b(?:clr|tst|not|negx?|bset|bclr|bchg|tas|addq|subq|or|and|eor)[bwl]?\b[^\n]*\bc0000[0-7]\b', lst)
     assert not rmw, f'read-modify-write on a VDP port: {rmw}'
+    # the loader reaches the extension only through its header (0x40000..0x40013)
+    for ln in lst.splitlines():
+        m = re.match(r'\s*(1[ef][0-9a-f]{3}):\t(.*)', ln)
+        if m and int(m.group(1), 16) < lma + size:
+            for t in re.findall(r'(?<![#\w])(4[0-9a-f]{4})(?!\w)', m.group(2).split('<')[0]):
+                assert int(t, 16) < EXT_ADDR + 0x14, f'loader uses the extension: {ln}'
 
-    # 4. hooks into the RAM-resident OS
+    # 4. patches to the RAM-resident OS, applied by the extension at boot (extMain); checked here
+    # against the OS image as it will be in RAM
+    img = bytearray(rom)
+    patches = []
+
     def patch(ram, old, new):
         off = ram - RAM
-        assert rom[off:off + len(old)] == old, f'{ram:06X}: expected {old.hex()} got {rom[off:off + len(old)].hex()}'
-        rom[off:off + len(new)] = new
+        assert img[off:off + len(old)] == old, f'{ram:06X}: expected {old.hex()} got {img[off:off + len(old)].hex()}'
+        if old[:len(new)] != new:
+            patches.append((ram, bytes(img[off:off + len(new)]), bytes(new)))
+        img[off:off + len(new)] = new
 
     jsr = lambda t: struct.pack('>HI', 0x4EB9, t)
-    patch(0xFF1220, jsr(0xFF1C58), jsr(syms['myInit']))                 # boot init
-    patch(0xFF1350, jsr(0xFF528E), jsr(syms['myMainMenu']))             # main menu (the stock one becomes .dead)
     patch(0xFF594A, jsr(0xFF7FB2), jsr(syms['ramMenuClear']))           # menu clear -> banner/overlay
     patch(0xFF5C7E, bytes.fromhex('4feffe002f02'), struct.pack('>HI', 0x4EF9, syms['ramSave']))
     patch(0xFF6640, bytes.fromhex('4a68000a670000d0'), jsr(syms['ramAHook']) + b'\x4e\x71')
@@ -472,7 +442,7 @@ def main():
         patch(ram, bytes.fromhex('42a7'), bytes.fromhex('2f04'))       # clr.l -(sp) -> move.l d4,-(sp)
     patch(0xFF64EA, bytes.fromhex('48780002'), bytes.fromhex('48784001'))
     patch(0xFF64F4, bytes.fromhex('47f900ff8ed0'), jsr(syms['ramPagePal']))
-    patch(0xFF693E, bytes.fromhex('303900ffe30c'), jsr(syms['ramBrowserC']))       # C: letter filter
+    patch(0xFF693E, bytes.fromhex('303900ffe30c'), jsr(syms['ramBrowserC']))       # C: search
     patch(0xFF3FEC, bytes.fromhex('6100fd2e588f'), jsr(syms['ramCheatApply']))       # GG codes: START
     patch(0xFF5642, bytes.fromhex('303900a13002080000016' '7f4'), jsr(syms['ramEraseWait']) + bytes.fromhex('4e71') * 3)  # erase wait
     disp = syms['ramAbout'] - (0xFF7C0A + 2)
@@ -496,7 +466,7 @@ def main():
         new = syms[f'O_{addr:06X}']
         hits = 0
         for i in insns:
-            if i.address in NOT_STRING_REFS or DEAD[0] <= i.address < DEAD[1]:
+            if i.address in NOT_STRING_REFS:
                 continue
             for k in range(2, i.size - 3, 2):
                 if struct.unpack_from('>I', i.bytes, k)[0] == addr:
@@ -509,29 +479,41 @@ def main():
         old_len = stock.index(b'\0', off) - off
         b = enc(text)
         assert len(b) <= old_len, f'{text!r} longer than {old_len}'
-        rom[off:off + old_len] = b + b'\0' * (old_len - len(b))
+        patch(addr, stock[off:off + old_len], b + b'\0' * (old_len - len(b)))
+    assert img[slice(*CHECKSUMMED)] == stock[slice(*CHECKSUMMED)]   # stock checksum input unchanged
+    assert img[0x40F8:0x40FE] == stock[0x40F8:0x40FE]
 
-    # 6. sanity checks
+    # 6. the extension: patch table, header size, padded to whole sectors (the loader copies sectors)
+    ext = bytearray((BUILD / 'ext.bin').read_bytes())
+    assert secs['.ext'][0] == EXT_ADDR and len(ext) <= EXT_SIZE
+    tab = bytearray()
+    for ram, old, new in patches:
+        tab += struct.pack('>IH', ram, len(new)) + old + new
+    tab += bytes(6)
+    toff = syms['patchTab'] - EXT_ADDR
+    assert len(tab) <= PATCH_MAX and not any(ext[toff:toff + PATCH_MAX]), f'patch table {len(tab)} > {PATCH_MAX}'
+    ext[toff:toff + len(tab)] = tab
+    assert ext[:12] == b'PTBX' + struct.pack('>II', EXT_ABI, build_id)
+    ext[12:16] = struct.pack('>I', len(ext))
+    ext += b'\xff' * (-len(ext) % 512)
+
+    # 7. the OS image: only the loader call changes in the stock code; signature = its own checksum
+    off = 0x1350
+    assert rom[off:off + 6] == jsr(0xFF528E)
+    rom[off:off + 6] = jsr(syms['loaderMain'])                          # main menu call -> loader
     assert rom[0x9B16:0xC000] == stock[0x9B16:0xC000]       # OS bss image untouched (must stay zero)
-    assert rom[slice(*CHECKSUMMED)] == stock[slice(*CHECKSUMMED)]   # stock checksum input unchanged
-    assert rom[0x40F8:0x40FE] == stock[0x40F8:0x40FE]
     assert not any(rom[0xE2C0:0xE400])                      # OS variables at 0xFFE302.. start zeroed
-    diff_code = sum(1 for i in range(CODE_END) if rom[i] != stock[i])
+    rom[SIG_OFF:SIG_OFF + 8] = b'PTBR' + struct.pack('>I', zlib.crc32(rom[:SIG_OFF]))
     OUT.write_bytes(rom)
     EXT_OUT.write_bytes(ext)
 
-    print(f'\nBuilt {OUT.name} ({len(rom)} bytes), build id {build_id:08X}')
-    for name, lma, size in placed:
-        print(f'  {name:9s} cart {lma:05X}..{lma + size - 1:05X}  {size:5d} bytes')
-    print(f'  free: ROMA {0x1FFF8 - max(secs[s][0] + secs[s][1] for s in (".text", ".ramstub"))} B, '
-          f'ROMB {0x1DB20 + 0x7A0 - (secs[".strb"][0] + secs[".strb"][1])} B, '
-          f'ROMC {0x1C220 + 0xA00 - (secs[".strc"][0] + secs[".strc"][1])} B')
-    print(f'  {EXT_OUT.name}: {len(ext)} bytes ({secs[".ext"][1]} used of {EXT_SIZE}), '
-          f'.dead {DEAD[1] - DEAD[0] - secs[".dead"][1]} B free')
+    print(f'\nBuilt {OUT.name}: loader {size} bytes at cart {lma:05X}, signature {rom[SIG_OFF + 4:].hex().upper()}')
+    print(f'Built {EXT_OUT.name}: {len(ext)} bytes ({EXT_SIZE - secs[".ext"][1] - secs[".ramstub"][1] - PATCH_MAX} '
+          f'of {EXT_SIZE} free), build id {build_id:08X}')
     bss = syms['bssEnd'] - syms['bssStart']
     print(f'  RAM: stubs {secs[".ramstub"][2]:06X} ({secs[".ramstub"][1]} B), bss {syms["bssStart"]:06X}..{syms["bssEnd"]:06X} ({bss} B)')
-    print(f'  {nrefs} string references repointed, {len(OS_INPLACE)} strings translated in place, '
-          f'{diff_code} bytes changed in the OS code/data area')
+    print(f'  {len(patches)} OS patches ({len(tab)} bytes): {nrefs} string references repointed, '
+          f'{len(OS_INPLACE)} strings translated in place')
 
 
 if __name__ == '__main__':

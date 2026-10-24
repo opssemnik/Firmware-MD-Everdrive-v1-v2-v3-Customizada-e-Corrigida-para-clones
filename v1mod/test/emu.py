@@ -43,6 +43,7 @@ class Machine:
         self.vbl = 0
         self.vbl_pending = False
         self.pad = 0
+        self.th = 0x40
         self.stopped = None
         self.calls = {}
         for addr, fn in {0xFF175A: self.sd_init, 0xFF182C: self.sd_read, 0xFF1912: self.sd_write,
@@ -141,10 +142,15 @@ class Machine:
             return 3                 # cart status: SPI/flash ready
         if off in (0x3000, 0x3001):
             return 0xFF
+        if off == 3:                    # pad 1 data port, active low: TH=1 -> C B R L D U, TH=0 -> START A
+            p = self.pad
+            v = (p & 0x3F) if self.th else ((p >> 2) & 0x30)
+            return (~v & 0x3F) | (0x40 if self.th else 0)
         return 0
 
     def io_w(self, mu, off, size, value, ud):
-        pass
+        if off == 3:
+            self.th = value & 0x40
 
     # ------------------------------------------------------------ VDP
     def vdp_r(self, mu, off, size, ud):
