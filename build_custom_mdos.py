@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.17'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.18'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -574,8 +574,8 @@ def build_custom_mdos():
     ext.emit(0x4e75)                                # rts
 
     # 3b. wallHook: end of ff37c2 (clear one plane, jmp from 0xFF37E0): after plane B is cleared the
-    # wallpaper goes back in. wallDraw copies its names (VRAM 0x1400) to rows 0-25 of the plane B
-    # page being drawn (rows 26-27 hold the file name bar).
+    # wallpaper goes back in. wallDraw copies its names (VRAM 0x1400) to rows 0-26 of the plane B
+    # page being drawn (row 27 holds the file name bar).
     ext.label('wallHook')
     ext.emit(0x4fef, 0x0018)                        # lea.l $18(a7), a7 (the replaced instructions)
     ext.emit(0x0c6f, 0xe000, 0x0006)                # cmpi.w #$e000, 6(a7) (plane B?)
@@ -595,7 +595,7 @@ def build_custom_mdos():
     ext.b_s(0x67, 'wh_page')
     ext.emit(0x0643, 0x1000)                        # addi.w #$1000, d3
     ext.label('wh_page')
-    ext.emit(0x7219)                                # moveq #25, d1 (rows 0-25)
+    ext.emit(0x721a)                                # moveq #26, d1 (rows 0-26)
     ext.label('wh_row')
     ext.emit(0x7000, 0x3002, 0xe588, 0xe448, 0x4840)    # d0 = VDP address command for d2 (read)
     ext.emit(0x2080)                                # move.l d0, (a0)
@@ -2160,15 +2160,20 @@ def build_custom_mdos():
     struct.pack_into('>HIHhHH', rom, 0x499E, 0x4EB9, all_labels['menuLR'], 0x6700,
                      0xFF48F2 - (0xFF49A4 + 2), 0x4E71, 0x4E71)
 
-    # B4. Browser layout: banner rows 0-2, a blank row, list rows 4-24 (was 3-23), page counter
-    #     ("Pág. x de y", was on the top bar) on row 25, file name bar rows 26-27 (was 25-26).
+    # B4. Browser layout: banner rows 0-2, a blank row, list rows 4-24 (was 3-23), a blank row, page
+    #     counter ("Pág. x de y", was on the top bar) on row 26, file name bar on row 27 only: one line
+    #     of up to 38 characters (was 32 + a second line for long names on 26-27).
     assert rom[0x0926:0x0928] == bytes.fromhex('7c03')
     rom[0x0927] = 4                                  # first list row
     assert rom[0x09E2:0x09E6] == bytes.fromhex('48780001')
-    rom[0x09E5] = 25                                 # page counter row
-    for off, old in ((0x097E, 0x19), (0x09B2, 0x19), (0x0AC2, 0x19), (0x0AEE, 0x1A)):
+    rom[0x09E5] = 26                                 # page counter row
+    for off, old, new in ((0x0976, 0x02, 0x01), (0x09AA, 0x02, 0x01),     # name bar fills: 1 row high
+                          (0x097E, 0x19, 0x1B), (0x09B2, 0x19, 0x1B),     #                 on row 27
+                          (0x0ABE, 0x20, 0x26), (0x0AC2, 0x19, 0x1B)):    # name: 38 characters, row 27
         assert rom[off:off + 4] == bytes.fromhex('487800%02x' % old), hex(off)
-        rom[off + 3] = old + 1                       # name bar fills and the two name lines
+        rom[off + 3] = new
+    assert rom[0x0AE8:0x0AEA] == bytes.fromhex('6330')
+    rom[0x0AE8] = 0x60                               # bls -> bra: no second name line
     # B4b. Footer: the file name bar (and the two fills that used to be the top bar) in the banner
     #      crimson (tile 1, palette 2) instead of grey; the page counter in gold (pagePal)
     for off in (0x096A, 0x0984, 0x09A4, 0x09B8):
@@ -2176,11 +2181,11 @@ def build_custom_mdos():
         rom[off + 2:off + 4] = bytes.fromhex('4001')
     assert rom[0x09C2:0x09C8] == bytes.fromhex('4a3900ffc478')
     struct.pack_into('>HI', rom, 0x09C2, 0x4EB9, all_labels['pagePal'])
-    # B5. No top bar on plane B any more: its two fills (y=1) repaint the bottom bar instead,
+    # B5. No top bar on plane B any more: its two fills (y=1) repaint the name bar (row 27) instead,
     #     so the banner (rows 0-2) sits on black like in the v1.
     for off in (0x0964, 0x099E):
         assert rom[off:off + 4] == bytes.fromhex('48780001'), hex(off)
-        rom[off + 3] = 0x1A
+        rom[off + 3] = 0x1B
 
     # B7. wallpaper: end of the plane clear (ff37c2: lea $18(a7),a7; rts) -> jmp wallHook
     assert rom[0x37E0:0x37E6] == bytes.fromhex('4fef00184e75')

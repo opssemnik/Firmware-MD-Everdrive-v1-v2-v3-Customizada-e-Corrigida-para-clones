@@ -8,8 +8,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `235163c774fad62584fa5189155750cd336bcd56afcaba84e06ff77efe427685` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `50825bd4c9afb031227553927907f4b66e13f672cb96a298a15259996edf0d68` |
+| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA | `5f68449c8db901b136deaae0d34799d1eafd6839359106546359d5b4c9dac13b` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `f99fdf16218d120b4bc7c29643d99a0c113c07364ba64368d199208d855a4d2d` |
 
 **Releases** ([página de Releases](../../releases)), 4 arquivos:
 
@@ -82,7 +82,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.17**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.18**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -116,7 +116,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.17**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.18**.
 
 ---
 

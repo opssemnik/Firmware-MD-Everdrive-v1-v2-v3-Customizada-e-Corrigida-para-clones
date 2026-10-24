@@ -6,6 +6,10 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.18 — 2026-10-19
+- **Margem antes do rodapé**: uma linha vazia entre o último jogo da página e a página (lista nas linhas 4-24, linha 25 vazia, página na 26).
+- A barra com o nome do arquivo ficou com **1 linha** (a 27): o nome mostra até 38 letras numa linha só, em vez de quebrar em duas.
+
 ### 1.17 — 2026-10-19
 - **Rodapé da lista de jogos**: "pág: x / y" em dourado e a barra com o nome do arquivo no vermelho do banner (antes cinza), com o nome em branco por cima.
 
@@ -106,6 +110,10 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.18 — 2026-10-19
+- **Margem antes do rodapé**: uma linha vazia entre o último jogo da página e a página (lista nas linhas 4-24, linha 25 vazia, página na 26).
+- A barra com o nome do arquivo ficou com **1 linha** (a 27): o nome mostra até 38 letras numa linha só, em vez de quebrar em duas.
 
 ### 1.17 — 2026-10-19
 - **Rodapé da lista de jogos**: "Pág. x de y" em dourado e a barra com o nome do arquivo no vermelho do banner (antes cinza), com o nome em branco por cima.

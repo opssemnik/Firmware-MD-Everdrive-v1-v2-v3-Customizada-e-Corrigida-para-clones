@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.17'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.18'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -398,12 +398,17 @@ def main():
     patch(0xFF6FC2, bytes.fromhex('70264e714e714e712f00487900ff951f47f900ff7ca44e93'),  # dispositivo
           pea_l(syms['S_version']) + pea_l(0xC000) + bytes.fromhex('47f900ff7ca4') + jsr(0xFF90A4))
     patch(0xFF660E, bytes.fromhex('303900ffe30c6604424560f4'), jsr(syms['ramIdle']) + b'\x4e\x71' * 3)  # input wait
-    # Browser two rows lower: the banner on rows 0-2, a blank row, then the list on rows 4-24,
-    # page row 23 -> 25, file name rows 24/25 -> 26/27 (bar on plane B and its clear)
-    for ram, old, new in ((0xFF657E, '48780002', '48780004'), (0xFF6260, '48780018', '4878001a'),
-                          (0xFF627A, '48780018', '4878001a'), (0xFF62E0, '48780019', '4878001b'),
-                          (0xFF64E4, '48780018', '4878001a'), (0xFF64FC, '48780017', '48780019'),
-                          (0xFF653A, '2ebc00000017', '2ebc00000019'), (0xFF6554, '48780017', '48780019')):
+    # Browser layout: banner rows 0-2, a blank row, list rows 4-24 (stock 2-22), a blank row, page
+    # counter on row 26 (stock 23), file name bar on row 27 only (stock 24-25, two lines): the name is
+    # one line of up to 38 characters (stock 36 + a second line for long names)
+    for ram, old, new in ((0xFF657E, '48780002', '48780004'),                    # first list row
+                          (0xFF6258, '48780002', '48780001'), (0xFF625C, '48780024', '48780026'),
+                          (0xFF6260, '48780018', '4878001b'),                    # name clear: row 27, 38 wide
+                          (0xFF6276, '48780024', '48780026'), (0xFF627A, '48780018', '4878001b'),  # name
+                          (0xFF62DA, '6334', '6034'),                            # no second name line
+                          (0xFF64DC, '48780002', '48780001'), (0xFF64E4, '48780018', '4878001b'),  # bar
+                          (0xFF64FC, '48780017', '4878001a'), (0xFF653A, '2ebc00000017', '2ebc0000001a'),
+                          (0xFF6554, '48780017', '4878001a')):                   # page counter row 26
         patch(ram, bytes.fromhex(old), bytes.fromhex(new))
     patch(0xFF64A8, bytes.fromhex('13fc000100ffe306'), jsr(syms['ramBrowserBanner']) + b'\x4e\x71')
     # footer: "pág: x / y" in gold (the three prints push d4 = palette 2, set by ramPagePal, instead
