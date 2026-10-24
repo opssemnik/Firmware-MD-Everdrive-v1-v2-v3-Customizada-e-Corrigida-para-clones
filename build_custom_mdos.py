@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.19'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.20'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -727,7 +727,7 @@ def build_custom_mdos():
     ext.emit(0x4ef9, 0x00ff, 0x1c92)                # jmp $ff1c92.l
 
     # 3d. pagePal: before the browser prints "Pág. x de y" (jsr from 0xFF09C2, replacing tst.b $ffc478.l):
-    # palette 1 (gold); draw_top_banner puts palette 0 back afterwards
+    # palette 1 (gold), the filter tag and the button help line; draw_top_banner puts palette 0 back
     ext.label('pagePal')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w
     ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
@@ -735,7 +735,11 @@ def build_custom_mdos():
     ext.emit(0x4878, 18)                            # pea.l 18.w (x)
     ext.emit(0x4879, 0x00ff, 0xc5a8)                # pea.l $ffc5a8.l ("[X]" or empty)
     ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
-    ext.emit(0x4fef, 0x0010)                        # lea.l $10(a7), a7
+    ext.emit(0x4878, 3)                             # pea.l 3.w (y: the help line under the banner)
+    ext.emit(0x4878, 1)                             # pea.l 1.w (x)
+    ext.pea_label('str_help')
+    ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
+    ext.emit(0x4fef, 0x001c)                        # lea.l $1c(a7), a7
     ext.emit(0x4a39, 0x00ff, 0xc478)                # tst.b $ffc478.l (the replaced instruction)
     ext.emit(0x4e75)                                # rts
 
@@ -1498,6 +1502,8 @@ def build_custom_mdos():
     ext.emit_str(b'Jogo Aleat\x86rio')
     ext.label('str_mm_cheats')
     ext.emit_str(b'Cheats')
+    ext.label('str_help')                           # browser, row 3 (pagePal)
+    ext.emit_str(b'A: arquivo  START: repetir  C: filtro')
     ext.label('str_mm_filter')
     ext.emit_str(b'Filtrar por Letra')
     ext.label('str_mm_devinfo')

@@ -304,9 +304,9 @@ static char gFilter;                    /* browser letter filter: 'A'..'Z', '#' 
 static u16 gFilterCount;                /* the filtered folder, to notice when the browser reloads it */
 static u32 gFilterCluster;
 
-/* "[M]" next to the page counter while a filter is on (blank otherwise); ramPagePal calls it before
- * every page counter print */
-ROMC_CODE void drawFilterTag(void)
+/* "[M]" next to the page counter while a filter is on (blank otherwise) and the button help on row 3;
+ * ramPagePal calls it before every page counter print (folder changes clear rows 0-24 of plane A) */
+ROMB_CODE void drawFilterTag(void)
 {
     char t[4] = {' ', ' ', ' ', 0};
     if (gFilter && (DIR_CLUSTER() != gFilterCluster || DIR_COUNT() != gFilterCount))
@@ -317,6 +317,8 @@ ROMC_CODE void drawFilterTag(void)
         t[2] = ']';
     }
     osPrint(PLANE_A, t, PAL2, 18, 26);
+    if (gBrowseMode)                    /* the help line under the banner ("Selecionar jogo" only) */
+        osPrintAl(PLANE_A, S_help, PAL2, 20, 3, ALIGN_CENTER);
 }
 
 void browserBanner(void)
