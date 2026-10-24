@@ -50,6 +50,8 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 |---|---|---|
 | ![Lista com capa](v1mod/screens/lista_com_capa.png) | ![Menu do jogo](v1mod/screens/menu_do_jogo.png) | ![Info da ROM](v1mod/screens/info_da_rom.png) |
 | Capa aparece ao parar sobre um jogo (v1) | Menu do jogo (botão A) | Info da ROM |
+| ![Busca: modos](v1mod/screens/busca_modos.png) | ![Busca: teclado](v1mod/screens/busca_teclado.png) | ![Busca: resultados](v1mod/screens/busca_resultados.png) |
+| Busca em todas as pastas (C) | Busca por nome: teclado na tela | Resultados: `[*]` ao lado da página, B volta |
 
 ![Temas](v1mod/screens/temas.png)
 
@@ -57,6 +59,10 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 |---|---|
 | ![Wallpaper v1](v1mod/screens/lista_wallpaper.png) | ![Wallpaper v3](v3/screens/lista_wallpaper.png) |
 | Banner e wallpaper inclusos (v1) | Banner e wallpaper inclusos (v3) |
+| ![Menu principal v3](v3/screens/menu_principal.png) | ![Busca v3](v3/screens/busca_resultados.png) |
+| Menu principal da v3 (C), com a busca | Resultados da busca na v3 |
+| ![Menu do arquivo v3](v3/screens/menu_do_arquivo.png) | ![Créditos v1](v1mod/screens/creditos.png) |
+| Menu do arquivo da v3 (A), com a capa | Créditos (v1: Ferramentas → sobre) |
 
 ---
 
@@ -191,7 +197,8 @@ cartucho, use um banner sem cores (o do zip principal).
 
 | v1 | v3 |
 |---|---|
-| ![Maddrugamers na v1](temas/maddrugamers/previa_v1.png) | ![Maddrugamers na v3](temas/maddrugamers/previa_v3.png) |
+| ![Maddrugamers na v1: menu](temas/maddrugamers/previa_v1_menu.png) | ![Maddrugamers na v3: menu](temas/maddrugamers/previa_v3_menu.png) |
+| ![Maddrugamers na v1: lista](temas/maddrugamers/previa_v1.png) | ![Maddrugamers na v3: lista](temas/maddrugamers/previa_v3.png) |
 
 Para criar um tema com cores, use `--cores` no conversor do banner (cores do Mega Drive em hexadecimal
 `0BGR`, só dígitos pares: fundo, faixa do menu, sombra da faixa, texto, texto apagado, destaque):
