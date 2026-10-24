@@ -6,6 +6,9 @@
 
 ## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
 
+### 1.25 — 2026-10-24
+- O firmware nos zips agora leva a versão no nome: **`OS-V38-PTBR-1.25.BIN`** (o conteúdo é o mesmo carregador desde a 1.22: quem já gravou não precisa gravar de novo, só trocar o `EDMD/V1EXT.BIN`).
+
 ### 1.24 — 2026-10-24
 - Sem mudanças além da versão (mesma numeração da v3). Quem já está na 1.22 ou 1.23 só troca o `EDMD/V1EXT.BIN`.
 
@@ -137,6 +140,9 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.25 — 2026-10-24
+- Sem mudanças além da versão (mesma numeração da v1 / v2).
 
 ### 1.24 — 2026-10-24
 - **Barra de ajuda alinhada com a lista**: agora termina na mesma coluna dos tamanhos dos jogos (`1M`..`4M`), sem passar do fim: `A: arquivo  START: repetir  C: menu`.
