@@ -6,6 +6,9 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.24 — 2026-10-24
+- Sem mudanças além da versão (mesma numeração da v3). Quem já está na 1.22 ou 1.23 só troca o `EDMD/V1EXT.BIN`.
+
 ### 1.23 — 2026-10-24
 - **Cores no banner:** um `BANNER.ART` pode trazer as cores do tema (fundo, faixa do menu, texto); com ele, essas cores valem no lugar do tema escolhido e o menu mostra **Tema: DO BANNER**. Novo `make_banner.py --cores`.
 - Primeiro tema pronto: **Maddrugamers** (`Tema-Maddrugamers.zip`), veja abaixo.
@@ -135,6 +138,9 @@
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
 
+### 1.24 — 2026-10-24
+- **Barra de ajuda alinhada com a lista**: agora termina na mesma coluna dos tamanhos dos jogos (`1M`..`4M`), sem passar do fim: `A: arquivo  START: repetir  C: menu`.
+
 ### 1.23 — 2026-10-24
 - **Cores no banner:** um `BANNER.ART` pode trazer as cores do tema; com ele, essas cores valem no lugar do tema escolhido em Opções.
 - Primeiro tema pronto: **Maddrugamers** (`Tema-Maddrugamers.zip`).
@@ -144,7 +150,7 @@
 ### 1.22 — 2026-10-24
 - **Busca em todas as pastas** (C → *Buscar em Todas as Pastas*, o primeiro item do menu): por nome, num teclado na tela (várias palavras: todas precisam aparecer), ou pela primeira letra. Os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página; capa, menu do arquivo e START funcionam normalmente, e **B** volta para a pasta onde você estava.
 - O **Filtrar por Letra** foi removido (substituído pela busca).
-- Barra de ajuda alinhada com a lista: `A: arquivo   START: repetir   C: menu`.
+- Barra de ajuda alinhada com a lista: `A: arquivo   START: repetir   C: menu` (até a 1.23 passava 2 colunas do fim da lista).
 
 ### 1.21 — 2026-10-24
 - Sem mudanças de código; só a versão (mesma numeração da v1). A busca em todas as pastas chega à v3 na próxima versão.

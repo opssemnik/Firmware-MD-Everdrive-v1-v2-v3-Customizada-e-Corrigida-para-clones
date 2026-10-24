@@ -268,7 +268,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.23'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.24'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -783,7 +783,7 @@ def build_custom_mdos():
     ext.emit(0x4879, 0x00ff, 0xc5a8)                # pea.l $ffc5a8.l ("[*]" or empty)
     ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
     ext.emit(0x4878, 3)                             # pea.l 3.w (y: the help line under the banner)
-    ext.emit(0x4878, 2)                             # pea.l 2.w (x: as wide as the list, columns 2-38)
+    ext.emit(0x4878, 2)                             # pea.l 2.w (x: as wide as the list, columns 2-36: sizes "1M".."4M")
     ext.pea_label('str_help')
     ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
     ext.emit(0x4fef, 0x001c)                        # lea.l $1c(a7), a7
@@ -1569,7 +1569,7 @@ def build_custom_mdos():
     ext.label('str_mm_cheats')
     ext.emit_str(b'Cheats')
     ext.label('str_help')                           # browser, row 3 (pagePal)
-    ext.emit_str(b'A: arquivo   START: repetir   C: menu')
+    ext.emit_str(b'A: arquivo  START: repetir  C: menu')
     ext.label('str_mm_search')
     ext.emit_str(b'Buscar em Todas as Pastas')
     ext.label('str_mm_devinfo')

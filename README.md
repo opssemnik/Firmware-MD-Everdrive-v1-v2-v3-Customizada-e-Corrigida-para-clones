@@ -9,8 +9,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
 | EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
-| EverDrive-MD **v1** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 | `431e2d09b52910bd7a3b0786b808530cef987d3837c0344d96a98559972c2091` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `97425bd0c88394ebf680cfe2cd8daef2cb7c7a32bed190e04880ca5ceeebcf9f` |
+| EverDrive-MD **v1** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 | `99ba4cac1eae70910ce9b2ab89eca18923c21be3305058f47f55a75ff97a960d` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `8d22b847aa5d43591cf44292049e6853675227bb3d452e2fa11ba6a4866e6fde` |
 
 **Releases** ([página de Releases](../../releases)): os firmwares e os temas:
 
@@ -99,7 +99,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.23**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.24**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -137,7 +137,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.23**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.24**.
 
 ---
 
