@@ -4,7 +4,7 @@
 - `sd/EDMD/BANNER.ART` e `sd/EDMD/WALL.ART`: banner e wallpaper retrô próprios (desde a 1.14).
 - 2176 capas `.ART` prontas em `sd/EDMD/ART` (geradas com `sync_roms_art.py` a partir da libretro-thumbnails).
 
-## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
+## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
 
 ### 1.24 — 2026-10-24
 - Sem mudanças além da versão (mesma numeração da v3). Quem já está na 1.22 ou 1.23 só troca o `EDMD/V1EXT.BIN`.

@@ -1,26 +1,27 @@
-# Firmware MD Everdrive v1 & v3 Customizada e Corrigida para clones
+# Firmware MD Everdrive v1, v2 & v3 Customizada e Corrigida para clones
 
 Sistema operacional (OS) customizado em **português do Brasil** para os flashcarts
-**EverDrive-MD v1** e **EverDrive-MD v3** de Mega Drive / Genesis, incluindo os clones vendidos
+**EverDrive-MD v1 / v2** (os dois usam o mesmo firmware) e **EverDrive-MD v3** de Mega Drive / Genesis,
+incluindo os clones vendidos
 no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e the Nobre**.
 
-![Menu principal (v1)](v1mod/screens/menu_principal.png)
+![Menu principal (v1 / v2)](v1mod/screens/menu_principal.png)
 
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
-| EverDrive-MD **v1** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
-| EverDrive-MD **v1** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 | `99ba4cac1eae70910ce9b2ab89eca18923c21be3305058f47f55a75ff97a960d` |
+| EverDrive-MD **v1 / v2** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
+| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `99ba4cac1eae70910ce9b2ab89eca18923c21be3305058f47f55a75ff97a960d` |
 | EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `8d22b847aa5d43591cf44292049e6853675227bb3d452e2fa11ba6a4866e6fde` |
 
 **Releases** ([página de Releases](../../releases)): os firmwares e os temas:
 
 | Arquivo | O que é |
 |---|---|
-| `SD-EverDrive-v1.zip` | **v1**, para a raiz do cartão SD: `OS-V38-PTBR.BIN` (o firmware, para gravar uma vez) e a pasta `EDMD` com `V1EXT.BIN` (a extensão, com todo o mod), capas, banner e wallpaper |
-| `SD-EverDrive-v1-sem-capas.zip` | **v1**, só o firmware e a extensão (`OS-V38-PTBR.BIN` + `EDMD/V1EXT.BIN`) |
+| `SD-EverDrive-v1-v2.zip` | **v1 / v2**, para a raiz do cartão SD: `OS-V38-PTBR.BIN` (o firmware, para gravar uma vez) e a pasta `EDMD` com `V1EXT.BIN` (a extensão, com todo o mod), capas, banner e wallpaper |
+| `SD-EverDrive-v1-v2-sem-capas.zip` | **v1 / v2**, só o firmware e a extensão (`OS-V38-PTBR.BIN` + `EDMD/V1EXT.BIN`) |
 | `MDOS.BIN` | firmware da **v3**, já com o nome certo |
 | `SD-EverDrive-v3.zip` | **v3**, para a raiz do cartão SD: `EDMD/MDOS.BIN` (o firmware), capas, banner e wallpaper |
-| `Tema-Maddrugamers.zip` | tema do canal [Maddrugamers](https://www.youtube.com/@maddrugamers) (v1 e v3): `EDMD/BANNER.ART` + `EDMD/WALL.ART`, com as cores do tema dentro do banner - veja [Temas](#temas) |
+| `Tema-Maddrugamers.zip` | tema do canal [Maddrugamers](https://www.youtube.com/@maddrugamers) (v1 / v2 e v3): `EDMD/BANNER.ART` + `EDMD/WALL.ART`, com as cores do tema dentro do banner - veja [Temas](#temas) |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -49,7 +50,7 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 | | | |
 |---|---|---|
 | ![Lista com capa](v1mod/screens/lista_com_capa.png) | ![Menu do jogo](v1mod/screens/menu_do_jogo.png) | ![Info da ROM](v1mod/screens/info_da_rom.png) |
-| Capa aparece ao parar sobre um jogo (v1) | Menu do jogo (botão A) | Info da ROM |
+| Capa aparece ao parar sobre um jogo (v1 / v2) | Menu do jogo (botão A) | Info da ROM |
 | ![Busca: modos](v1mod/screens/busca_modos.png) | ![Busca: teclado](v1mod/screens/busca_teclado.png) | ![Busca: resultados](v1mod/screens/busca_resultados.png) |
 | Busca em todas as pastas (C) | Busca por nome: teclado na tela | Resultados: `[*]` ao lado da página, B volta |
 
@@ -58,18 +59,20 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 | | |
 |---|---|
 | ![Wallpaper v1](v1mod/screens/lista_wallpaper.png) | ![Wallpaper v3](v3/screens/lista_wallpaper.png) |
-| Banner e wallpaper inclusos (v1) | Banner e wallpaper inclusos (v3) |
+| Banner e wallpaper inclusos (v1 / v2) | Banner e wallpaper inclusos (v3) |
 | ![Menu principal v3](v3/screens/menu_principal.png) | ![Busca v3](v3/screens/busca_resultados.png) |
 | Menu principal da v3 (C), com a busca | Resultados da busca na v3 |
 | ![Menu do arquivo v3](v3/screens/menu_do_arquivo.png) | ![Créditos v1](v1mod/screens/creditos.png) |
-| Menu do arquivo da v3 (A), com a capa | Créditos (v1: Ferramentas → sobre) |
+| Menu do arquivo da v3 (A), com a capa | Créditos (v1 / v2: Ferramentas → sobre) |
 
 ---
 
-## EverDrive-MD v1
+## EverDrive-MD v1 / v2
+
+O v2 usa o mesmo firmware do v1 (OS v38): tudo desta seção vale para os dois.
 
 ### Instalação
-1. Extraia o `SD-EverDrive-v1.zip` (ou o `-sem-capas`) da release na raiz do cartão SD: ele traz o
+1. Extraia o `SD-EverDrive-v1-v2.zip` (ou o `-sem-capas`) da release na raiz do cartão SD: ele traz o
    `OS-V38-PTBR.BIN` e o `EDMD/V1EXT.BIN`.
 2. No cartucho: **Ferramentas → gravar OS** (no OS original: *toolbox → update OS*), escolha o
    `OS-V38-PTBR.BIN` e confirme. O console reinicia sozinho.
@@ -136,7 +139,7 @@ resto do próprio `MDOS.BIN` quando você as abre.
 | START | repete o último jogo |
 | **A** | menu do arquivo em tela cheia, com o nome do jogo e a capa (Carregar e Jogar, Só Carregar, Jogar com Cheats, Favoritar Jogo, Info da ROM, Ver em Hex); dentro dele, **ESQ/DIR** vai para o jogo anterior/seguinte |
 | B | volta |
-| **C** | menu principal: **Buscar em Todas as Pastas** (o primeiro item: C e A), Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos. A busca funciona como na v1: por nome (teclado na tela) ou pela primeira letra; os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página, e **B** volta para a pasta onde você estava |
+| **C** | menu principal: **Buscar em Todas as Pastas** (o primeiro item: C e A), Opções, Jogos Recentes, Favoritos, Jogo Aleatório, Cheats, Info Sistema, Créditos. A busca funciona como na v1 / v2: por nome (teclado na tela) ou pela primeira letra; os resultados (até 512) aparecem como uma pasta, com `[*]` ao lado da página, e **B** volta para a pasta onde você estava |
 
 **Capa na lista:** parado ~0,3 s sobre um jogo, a capa aparece no centro à direita da lista;
 qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega nada.
@@ -156,7 +159,7 @@ um banner retrô próprio em `sd/EDMD/BANNER.ART` (gerado por [`arte/gen_arte.py
 - Tamanho: **288×24 px** (36×3 tiles), até **13 cores** (a paleta do Mega Drive tem 512 cores; o
   conversor ajusta). A cor 1 da paleta fica reservada para o vermelho da faixa de destaque dos menus.
   Use um fundo opaco: a imagem é desenhada inteira.
-- Converta e copie para o cartão SD em **`/EDMD/BANNER.ART`** (vale para v1 e v3):
+- Converta e copie para o cartão SD em **`/EDMD/BANNER.ART`** (vale para v1 / v2 e v3):
 
 ```
 pip install pillow
@@ -169,7 +172,7 @@ precisam ser convertidos de novo.
 
 ## Wallpaper
 
-Uma imagem atrás da lista de jogos e dos menus, em `/EDMD/WALL.ART` (vale para v1 e v3). Sem o
+Uma imagem atrás da lista de jogos e dos menus, em `/EDMD/WALL.ART` (vale para v1 / v2 e v3). Sem o
 arquivo, o fundo continua liso. O repositório e os zips da release já trazem um wallpaper retrô
 próprio (`sd/EDMD/WALL.ART`, de [`arte/gen_arte.py`](arte/gen_arte.py)).
 
@@ -187,18 +190,18 @@ python make_wallpaper.py meu_wallpaper.png E:/EDMD/WALL.ART --dim 0.55
 
 Um tema é um banner + wallpaper, e o banner pode trazer também as **cores** do tema (fundo, faixa do
 menu, texto). Basta copiar a pasta `EDMD` do zip do tema para a raiz do cartão (substitui o
-`BANNER.ART` e o `WALL.ART`); vale para v1 e v3. Com um banner que traz cores, elas valem no lugar do
-tema escolhido no cartucho (na v1 o item aparece como **Tema: DO BANNER**); para voltar aos temas do
+`BANNER.ART` e o `WALL.ART`); vale para v1 / v2 e v3. Com um banner que traz cores, elas valem no lugar do
+tema escolhido no cartucho (na v1 / v2 o item aparece como **Tema: DO BANNER**); para voltar aos temas do
 cartucho, use um banner sem cores (o do zip principal).
 
 | Tema | Arquivo na release | Fonte |
 |---|---|---|
 | **Maddrugamers**, para o canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers): preto, letreiro verde com sombra 3D e joysticks | `Tema-Maddrugamers.zip` | [`temas/maddrugamers`](temas/maddrugamers), gerado por [`arte/gen_maddruga.py`](arte/gen_maddruga.py) (arte própria) |
 
-| v1 | v3 |
+| v1 / v2 | v3 |
 |---|---|
-| ![Maddrugamers na v1: menu](temas/maddrugamers/previa_v1_menu.png) | ![Maddrugamers na v3: menu](temas/maddrugamers/previa_v3_menu.png) |
-| ![Maddrugamers na v1: lista](temas/maddrugamers/previa_v1.png) | ![Maddrugamers na v3: lista](temas/maddrugamers/previa_v3.png) |
+| ![Maddrugamers na v1 / v2: menu](temas/maddrugamers/previa_v1_menu.png) | ![Maddrugamers na v3: menu](temas/maddrugamers/previa_v3_menu.png) |
+| ![Maddrugamers na v1 / v2: lista](temas/maddrugamers/previa_v1.png) | ![Maddrugamers na v3: lista](temas/maddrugamers/previa_v3.png) |
 
 Para criar um tema com cores, use `--cores` no conversor do banner (cores do Mega Drive em hexadecimal
 `0BGR`, só dígitos pares: fundo, faixa do menu, sombra da faixa, texto, texto apagado, destaque):
@@ -210,7 +213,7 @@ python make_banner.py meu_banner.png E:/EDMD/BANNER.ART --cores 000,0A0,040,EEE,
 ## Capas (box art)
 
 O repositório já traz **2176 capas prontas** em [`sd/EDMD/ART`](sd/EDMD/ART) (também dentro dos
-`SD-EverDrive-v1.zip` / `SD-EverDrive-v3.zip` da página de Releases).
+`SD-EverDrive-v1-v2.zip` / `SD-EverDrive-v3.zip` da página de Releases).
 
 **Onde colocar:** copie a pasta `EDMD` de dentro de `sd/` para a **raiz do cartão SD**, ficando assim:
 
@@ -231,7 +234,7 @@ Cartão SD (E:\)
 Se já existir uma pasta `EDMD` no cartão, só junte o conteúdo (não apague a `SAVE`). As ROMs podem
 ficar em qualquer pasta; a capa é encontrada pelo conteúdo da ROM, não pelo nome do arquivo.
 
-Ambas as versões (v1 e v3) usam o mesmo formato: `/EDMD/ART/XXXXXXXX.ART`, onde `XXXXXXXX` é um
+Ambas as versões (v1 / v2 e v3) usam o mesmo formato: `/EDMD/ART/XXXXXXXX.ART`, onde `XXXXXXXX` é um
 hash dos primeiros 512 bytes da ROM (12×9 tiles, 14 cores). Se algum jogo seu não tiver capa
 (dump diferente, hack, tradução), gere as que faltam a partir das imagens da Libretro:
 
@@ -250,10 +253,10 @@ Os arquivos originais **não** estão no repositório. Coloque-os na pasta do pr
 
 | Para | Arquivos necessários |
 |---|---|
-| v1 (`build_v1_ptbr.py`) | `OS-V38.BIN` (dump do seu v1), `os-v36-retrogamer-poa.bin` (bloco do logo RetroGamer POA) |
+| v1 / v2 (`build_v1_ptbr.py`) | `OS-V38.BIN` (dump do seu v1 ou v2), `os-v36-retrogamer-poa.bin` (bloco do logo RetroGamer POA) |
 | v3 (`build_custom_mdos.py`) | `MDOS.patched.BIN` |
 
-**v1** — o código novo é C + assembly em [`v1mod/`](v1mod), compilado com GCC m68k no WSL (Debian).
+**v1 / v2** — o código novo é C + assembly em [`v1mod/`](v1mod), compilado com GCC m68k no WSL (Debian).
 `loader.c` é o carregador que vai no OS; o resto (`mod.c`, `search.c`, `hooks.S`) vira o `V1EXT.BIN`,
 junto com a tabela de alterações do OS em RAM (tradução e ganchos) que a extensão aplica no boot:
 
@@ -268,7 +271,7 @@ python build_v1_ptbr.py          # gera OS-V38-PTBR.BIN + V1EXT.BIN (extensão) 
 O script verifica cada byte original antes de alterar (a extensão confere de novo no cartucho, antes de
 aplicar) e só muda o `OS-V38-PTBR.BIN` quando o carregador muda.
 
-**Testes (v1)** — `v1mod/test/` roda o OS de verdade num emulador 68000 (Unicorn) com VDP, flash,
+**Testes (v1 / v2)** — `v1mod/test/` roda o OS de verdade num emulador 68000 (Unicorn) com VDP, flash,
 controle e cartão SD simulados, inclusive com a checagem de alinhamento de memória do 68000 real:
 
 ```
