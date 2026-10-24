@@ -21,7 +21,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.16'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.17'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 
@@ -406,6 +406,12 @@ def main():
                           (0xFF653A, '2ebc00000017', '2ebc00000019'), (0xFF6554, '48780017', '48780019')):
         patch(ram, bytes.fromhex(old), bytes.fromhex(new))
     patch(0xFF64A8, bytes.fromhex('13fc000100ffe306'), jsr(syms['ramBrowserBanner']) + b'\x4e\x71')
+    # footer: "pág: x / y" in gold (the three prints push d4 = palette 2, set by ramPagePal, instead
+    # of 0) and the file name bar in the banner crimson (tile 1, palette 2) instead of grey
+    for ram in (0xFF6504, 0xFF6544, 0xFF655C):
+        patch(ram, bytes.fromhex('42a7'), bytes.fromhex('2f04'))       # clr.l -(sp) -> move.l d4,-(sp)
+    patch(0xFF64EA, bytes.fromhex('48780002'), bytes.fromhex('48784001'))
+    patch(0xFF64F4, bytes.fromhex('47f900ff8ed0'), jsr(syms['ramPagePal']))
     patch(0xFF3FEC, bytes.fromhex('6100fd2e588f'), jsr(syms['ramCheatApply']))       # GG codes: START
     patch(0xFF5642, bytes.fromhex('303900a13002080000016' '7f4'), jsr(syms['ramEraseWait']) + bytes.fromhex('4e71') * 3)  # erase wait
     disp = syms['ramAbout'] - (0xFF7C0A + 2)

@@ -158,6 +158,12 @@ ramEraseWait:
     dbra    %d7, 6b
     rts
 
+    .globl  ramPagePal
+ramPagePal:                     /* browser, before the page counter (was lea $ff8ed0,a3 at $ff64f4): every */
+    lea     0xFF8ED0, %a3       /* page redraw passes here; d4 = palette 2 (gold) is pushed as the colour */
+    move.l  #0x4000, %d4        /* of the three "pág: x / y" prints */
+    rts
+
     .globl  ramBrowserBanner
 ramBrowserBanner:               /* browser full redraw (was move.b #1,$ffe306 at $ff64a8) */
     move.b  #1, (0xFFE306).l

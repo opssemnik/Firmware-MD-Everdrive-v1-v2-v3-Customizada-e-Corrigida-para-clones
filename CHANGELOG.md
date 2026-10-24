@@ -6,6 +6,9 @@
 
 ## EverDrive-MD v1 — `OS-V38-PTBR.BIN`
 
+### 1.17 — 2026-10-19
+- **Rodapé da lista de jogos**: "pág: x / y" em dourado e a barra com o nome do arquivo no vermelho do banner (antes cinza), com o nome em branco por cima.
+
 ### 1.16 — 2026-10-19
 - Sem mudanças de código; só a versão (mesma numeração da v3). O build agora recusa instruções de leitura-e-escrita nas portas do vídeo (a causa da tela preta da v3).
 
@@ -103,6 +106,9 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.17 — 2026-10-19
+- **Rodapé da lista de jogos**: "Pág. x de y" em dourado e a barra com o nome do arquivo no vermelho do banner (antes cinza), com o nome em branco por cima.
 
 ### 1.16 — 2026-10-19
 - **Correção: tela preta ao ligar nas versões 1.14 e 1.15.** O código novo do boot (que prepara a memória de vídeo para o wallpaper) zerava uma tabela usando `clr.w` na porta de dados do VDP. No 68000 essa instrução lê a porta antes de escrever, e ler a porta de dados com o VDP em modo de escrita trava o console de verdade (o emulador não acusava). Trocado por `move`; o build agora recusa esse tipo de instrução nas portas do VDP e o emulador de testes acusa a leitura.

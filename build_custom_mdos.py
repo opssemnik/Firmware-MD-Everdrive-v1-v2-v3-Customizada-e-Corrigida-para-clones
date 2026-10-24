@@ -264,7 +264,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.16'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.17'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -694,6 +694,15 @@ def build_custom_mdos():
     ext.emit(0x4eb9, 0x00ff, 0x23c6)                # jsr $ff23c6.l (fatRead)
     ext.emit(0x4fef, 0x000c)                        # lea.l $c(a7), a7
     ext.emit(0x4a00)                                # tst.b d0
+    ext.emit(0x4e75)                                # rts
+
+    # 3d. pagePal: before the browser prints "Pág. x de y" (jsr from 0xFF09C2, replacing tst.b $ffc478.l):
+    # palette 1 (gold); draw_top_banner puts palette 0 back afterwards
+    ext.label('pagePal')
+    ext.emit(0x4878, 0x0001)                        # pea.l $1.w
+    ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
+    ext.emit(0x588f)                                # addq.l #4, a7
+    ext.emit(0x4a39, 0x00ff, 0xc478)                # tst.b $ffc478.l (the replaced instruction)
     ext.emit(0x4e75)                                # rts
 
     # 4. applyTheme
@@ -2160,6 +2169,13 @@ def build_custom_mdos():
     for off, old in ((0x097E, 0x19), (0x09B2, 0x19), (0x0AC2, 0x19), (0x0AEE, 0x1A)):
         assert rom[off:off + 4] == bytes.fromhex('487800%02x' % old), hex(off)
         rom[off + 3] = old + 1                       # name bar fills and the two name lines
+    # B4b. Footer: the file name bar (and the two fills that used to be the top bar) in the banner
+    #      crimson (tile 1, palette 2) instead of grey; the page counter in gold (pagePal)
+    for off in (0x096A, 0x0984, 0x09A4, 0x09B8):
+        assert rom[off:off + 4] == bytes.fromhex('48780002'), hex(off)
+        rom[off + 2:off + 4] = bytes.fromhex('4001')
+    assert rom[0x09C2:0x09C8] == bytes.fromhex('4a3900ffc478')
+    struct.pack_into('>HI', rom, 0x09C2, 0x4EB9, all_labels['pagePal'])
     # B5. No top bar on plane B any more: its two fills (y=1) repaint the bottom bar instead,
     #     so the banner (rows 0-2) sits on black like in the v1.
     for off in (0x0964, 0x099E):
