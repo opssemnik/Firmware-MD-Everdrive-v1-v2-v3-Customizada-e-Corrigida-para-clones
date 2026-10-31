@@ -21,6 +21,7 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | `SD-EverDrive-v1-v2-sem-capas.zip` | **v1 / v2**, só o firmware, a extensão e os temas (`OS-V38-PTBR-<versão>.BIN` + `EDMD/V1EXT.BIN` + `EDMD/TEMAS.BIN`) |
 | `MDOS.BIN` | firmware da **v3**, já com o nome certo |
 | `SD-EverDrive-v3.zip` | **v3**, para a raiz do cartão SD: `EDMD/MDOS.BIN` (o firmware), capas e os temas (`TEMAS.BIN`) |
+| `SD-EverDrive-v3-sem-capas.zip` | **v3**, só o firmware e os temas (`EDMD/MDOS.BIN` + `EDMD/TEMAS.BIN`) |
 | `Unbrick-Recuperar-EverDrive-v3.zip` | **v3 travado** pela proteção do OS original ("EverDrive clone detected"): o OS PT-BR com o reparo do boot - veja [Unbrick](#unbrick---recuperar-v3-travado) |
 | `TEMAS.BIN` | os 7 temas num arquivo só (v1 / v2 e v3), para quem baixou só o firmware: vai em `/EDMD/TEMAS.BIN` - veja [Temas](#temas) |
 
