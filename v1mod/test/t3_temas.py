@@ -84,12 +84,12 @@ check('Idioma:        ENGLISH' in m.text(), 'options: ENGLISH shown')
 
 # 4. English
 m = emu3.boot(V3, 'sd/sdt.img', frames=60, log=logs.append)
-m.mu.mem_write(settings(m) + 0xC, b'\x01\x03')      # English, theme 3
+m.mu.mem_write(settings(m) + 0xC, bytes([1, 4]))    # English, theme 4 (OUTRUN)
 m.press('a', after=250)
 t = '\n'.join(lines(m))
 print(t)
 check('A: file     START: replay   C: menu' in t and 'Page' in t, 'English browser (help line, page counter)')
-check(shows_theme(m, 3), 'theme 3 (OUTRUN) at boot')
+check(shows_theme(m, 4), 'theme 4 (OUTRUN) at boot')
 m.press('c', after=200)
 t = '\n'.join(lines(m))
 print(t)

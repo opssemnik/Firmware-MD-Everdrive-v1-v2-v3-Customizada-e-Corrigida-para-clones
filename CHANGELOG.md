@@ -8,7 +8,7 @@
 ## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
 
 ### 1.27 — 2026-10-31
-- **Temas num arquivo só:** `EDMD/TEMAS.BIN` traz 7 temas completos (banner, wallpaper e cores): PADRÃO, RG POA, SEGA 16, OUTRUN, SYNTHWAVE, MADDRUGA e o novo **RETROCHIMP** (grupo Retrochimp Games). O item **Tema** do menu principal troca de tema na hora; a arte de PADRÃO, RG POA, SEGA 16, OUTRUN e RETROCHIMP é nova.
+- **Temas num arquivo só:** `EDMD/TEMAS.BIN` traz 7 temas completos (banner, wallpaper e cores): PADRÃO, RG POA, o novo **RETROCHIMP** (grupo Retrochimp Games, com QR code para o WhatsApp do ADM), SEGA 16, OUTRUN, SYNTHWAVE e MADDRUGA. O item **Tema** do menu principal troca de tema na hora; a arte de PADRÃO, RG POA, SEGA 16, OUTRUN e RETROCHIMP é nova.
 - **Idioma / Language:** novo item **Idioma** no menu principal: português ou inglês (English), troca na hora e fica salvo no cartucho.
 - Sem o `TEMAS.BIN` tudo continua como antes (`BANNER.ART` / `WALL.ART` avulsos e os 4 conjuntos de cores).
 - Só o `V1EXT.BIN` mudou: quem já está na 1.22 ou mais nova troca o `EDMD/V1EXT.BIN` e copia o `EDMD/TEMAS.BIN`.

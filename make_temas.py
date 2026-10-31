@@ -23,11 +23,11 @@ SLOT, WALL = 64, 8
 ORDER = [   # folder in temas/, name in the menu (the order is the theme number saved in the settings)
     ('padrao', 'PADRÃO'),
     ('rgpoa', 'RG POA'),
+    ('retrochimp', 'RETROCHIMP'),
     ('sega16', 'SEGA 16'),
     ('outrun', 'OUTRUN'),
     ('synthwave', 'SYNTHWAVE'),
     ('maddrugamers', 'MADDRUGA'),
-    ('retrochimp', 'RETROCHIMP'),
 ]
 ACCENTS = 'çãõáéúóÃ'
 

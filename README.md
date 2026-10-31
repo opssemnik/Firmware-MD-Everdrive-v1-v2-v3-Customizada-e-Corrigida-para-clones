@@ -37,8 +37,8 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 - **Tudo em português**, com acentos (á à â ã é ê í ó ô õ ú ç) desenhados no estilo da fonte original,
   ou **em inglês**: o idioma é escolhido no menu (veja [Idioma](#idioma--language))
 - **7 temas** completos (banner no topo, wallpaper atrás da lista e cores), todos num arquivo só no
-  cartão (`/EDMD/TEMAS.BIN`) e escolhidos no menu: PADRÃO, RG POA, SEGA 16, OUTRUN, SYNTHWAVE,
-  MADDRUGA e RETROCHIMP (veja [Temas](#temas)); banner e wallpaper também podem ser **imagens suas**
+  cartão (`/EDMD/TEMAS.BIN`) e escolhidos no menu: PADRÃO, RG POA, RETROCHIMP, SEGA 16, OUTRUN,
+  SYNTHWAVE e MADDRUGA (veja [Temas](#temas)); banner e wallpaper também podem ser **imagens suas**
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
   nos recentes; o último item da lista, **[ LIMPAR RECENTES ]** (com uma faixa vermelha atrás), apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
@@ -222,11 +222,11 @@ v1 / v2 pelo item **Tema** do menu principal (o tema troca na hora), na v3 em **
 |---|---|
 | **PADRÃO** | "EVERDRIVE MD" cromado sobre uma placa de circuito, preto e ciano |
 | **RG POA** | "RETROGAMER POA" dourado, pôr do sol no Guaíba com a chaminé do Gasômetro |
+| **RETROCHIMP** | do grupo Retrochimp Games (importação de jogos japoneses): listras anos 70, letreiro creme com sombra colorida, o chimpanzé de óculos e boné e um QR code para o WhatsApp do ADM do grupo |
 | **SEGA 16** | "16-BIT POWER" azul cromado, piso xadrez e um planeta com anel |
 | **OUTRUN** | estrada ao pôr do sol com palmeiras, rosa e laranja |
 | **SYNTHWAVE** | a arte retrô original do mod: sol listrado, montanhas e grade roxa |
 | **MADDRUGA** | do canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers): letreiro verde com sombra 3D e joysticks |
-| **RETROCHIMP** | do grupo Retrochimp Games: listras anos 70, letreiro creme com sombra colorida, o chimpanzé de óculos e boné |
 
 Sem o `TEMAS.BIN`, valem os arquivos avulsos `BANNER.ART` e `WALL.ART` (veja acima) e os 4 conjuntos de
 cores embutidos no firmware (PADRÃO, RG POA, SEGA 16 e OUTRUN).

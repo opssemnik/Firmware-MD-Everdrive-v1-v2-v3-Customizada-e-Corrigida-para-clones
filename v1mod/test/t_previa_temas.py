@@ -8,7 +8,7 @@ import emu3
 
 R = Path(__file__).resolve().parents[2]
 V3 = str(R / 'MDOS.ptbr.BIN')
-NAMES = ['PADRÃO', 'RG POA', 'SEGA 16', 'OUTRUN', 'SYNTHWAVE', 'MADDRUGA', 'RETROCHIMP']
+NAMES = ['PADRÃO', 'RG POA', 'RETROCHIMP', 'SEGA 16', 'OUTRUN', 'SYNTHWAVE', 'MADDRUGA']
 shots = []
 for t, name in enumerate(NAMES):
     m = emu3.boot(V3, 'sd/sdt.img', frames=60, log=lambda s: None)

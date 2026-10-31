@@ -52,7 +52,7 @@ check('Tema: RG POA' in m.text() and shows_theme(m, 1), 'theme item: RG POA load
 n0 = m.mu.reg_read(0)
 for k in range(2, 7):
     m.press('a', after=400)
-check('Tema: RETROCHIMP' in m.text() and shows_theme(m, 6), 'cycled to the last theme (RETROCHIMP)')
+check('Tema: MADDRUGA' in m.text() and shows_theme(m, 6), 'cycled to the last theme (MADDRUGA)')
 m.press('a', after=400)
 check('Tema: PADR*O' in m.text() and shows_theme(m, 0), 'wraps around to PADRÃO')
 m.press('a', after=400)                             # theme 1 again, saved
