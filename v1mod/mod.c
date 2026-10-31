@@ -372,9 +372,39 @@ void drawFilterTag(void)
         t[1] = '*';
         t[2] = ']';
     }
-    osPrint(PLANE_A, t, PAL2, 18, 26);
+    osPrint(PLANE_A, t, PAL2, 33, 26);  /* over the page counter */
     if (gBrowseMode)                    /* "Selecionar jogo" only */
         osPrint(PLANE_A, S_help, PAL2, 2, 3);
+}
+
+/* the page counter "x/y" in gold, right-aligned at the end of the file name bar (row 27, the name uses
+ * columns 2-32); first = first entry of the page (21 per page), pages = page count */
+void pageCount(u32 first, u32 pages)
+{
+    char t[16], *p = t + sizeof(t) - 1;
+    u32 page = 1, n;
+    int w;
+    first &= 0xFFFF;
+    pages &= 0x1FFF;
+    while (first >= 21) {
+        first -= 21;
+        page++;
+    }
+    *p = 0;
+    for (n = pages; ; ) {
+        *--p = '0' + (n - (n / 10) * 10);
+        if (!(n /= 10))
+            break;
+    }
+    *--p = '/';
+    for (n = page; ; ) {
+        *--p = '0' + (n - (n / 10) * 10);
+        if (!(n /= 10))
+            break;
+    }
+    for (w = t + sizeof(t) - 1 - p; w < 6; w++)
+        *--p = ' ';                     /* 6 columns at least: a longer old counter is wiped */
+    osPrint(PLANE_A, p, PAL2, 39 - (t + sizeof(t) - 1 - p), 27);
 }
 
 void browserBanner(void)

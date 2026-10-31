@@ -51,7 +51,18 @@ class MachineV3(emu.Machine):
                          0xFF118A: self.ret0, 0xFF567E: self.start_game}.items():
             mu.hook_add(UC_HOOK_CODE, self._wrap(fn), begin=addr, end=addr)
         mu.hook_add(UC_HOOK_MEM_UNMAPPED, self.unmapped)
+        # the cart SRAM (settings, recents, favourites: 0x100000..0x13FFFF here) keeps only the low byte
+        # of each word on the real cart: a byte written to an even address or a word with a high byte
+        # is lost there (the 1.27 language byte bug), so flag it
+        mu.hook_add(UC_HOOK_MEM_WRITE, self.sram_w, begin=0x100000, end=0x13FFFF)
         mu.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, self.align, begin=0xFF0000, end=0xFFFFFF)
+
+    def sram_w(self, mu, access, addr, size, value, ud):
+        if mu.reg_read(UC_M68K_REG_PC) in (0xFF5656, 0xFF5658):    # the stock memcpy (last game record):
+            return                                                  # as in the original OS
+        if (size == 1 and not addr & 1) or (size == 2 and value & 0xFF00) or size == 4:
+            self.log(f'!! SRAM write the cart would lose: {size} bytes {value:X} at {addr:06X} '
+                     f'pc={mu.reg_read(UC_M68K_REG_PC):06X}')
 
     def ret_void(self):
         return 0

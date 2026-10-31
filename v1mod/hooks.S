@@ -170,6 +170,16 @@ ramPagePal:                     /* browser, before the page counter (was lea $ff
     move.l  #0x4000, %d4
     rts
 
+    .globl  ramPageCount
+ramPageCount:                   /* page counter (was the three "pag: x / y" prints at $ff64fc): */
+    movem.l %d0-%d1/%a0-%a1, -(%sp)     /* d3 = first entry of the page, d2 = pages */
+    move.l  %d2, -(%sp)
+    move.l  %d3, -(%sp)
+    jsr     pageCount
+    addq.l  #8, %sp
+    movem.l (%sp)+, %d0-%d1/%a0-%a1
+    rts
+
     .globl  ramBrowserBanner
 ramBrowserBanner:               /* browser full redraw (was move.b #1,$ffe306 at $ff64a8) */
     move.b  #1, (0xFFE306).l

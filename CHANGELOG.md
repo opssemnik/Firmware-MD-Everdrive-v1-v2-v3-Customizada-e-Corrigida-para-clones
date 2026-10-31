@@ -7,6 +7,10 @@
 
 ## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
 
+### 1.29 — 2026-10-31
+- **Rodapé com espaço:** a linha acima do rodapé fica vazia; o contador de página vai para a direita da barra do nome, no formato curto **1/3** (o nome mostra até 31 caracteres). A marca `[*]` dos resultados da busca fica logo acima do contador.
+- Só o `V1EXT.BIN` mudou: quem já está na 1.22 ou mais nova troca o `EDMD/V1EXT.BIN`.
+
 ### 1.28 — 2026-10-31
 - **Mais espaço na lista:** a linha de ajuda fica separada do banner e da lista de jogos (uma linha vazia antes da lista, que agora ocupa as linhas 5 a 25); os banners dos 7 temas ganharam uma folga embaixo. Continuam 21 jogos por página.
 - Tema **RETROCHIMP** em 3º, com a mensagem do grupo e um QR code para o WhatsApp do ADM.
@@ -155,6 +159,10 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.29 — 2026-10-31
+- **Correção do idioma:** a troca de idioma deixava o menu bagunçado (a mensagem não cabia na tela) e não ficava salva direito (a SRAM do cartucho só guarda um byte de cada palavra). Agora o idioma fica salvo junto com o tema e **o console reinicia sozinho**, já no idioma novo.
+- **Rodapé com espaço:** a linha acima do rodapé fica vazia; o contador de página vai para a direita da barra do nome, no formato curto **1/3** (o nome mostra até 31 caracteres).
 
 ### 1.28 — 2026-10-31
 - **Mais espaço na lista:** a linha de ajuda fica separada do banner e da lista de jogos (uma linha vazia antes da lista, que agora ocupa as linhas 5 a 25); os banners dos 7 temas ganharam uma folga embaixo. Continuam 21 jogos por página.

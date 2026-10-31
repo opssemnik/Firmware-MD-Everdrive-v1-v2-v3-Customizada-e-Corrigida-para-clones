@@ -1,14 +1,15 @@
 """v3: themes from /EDMD/TEMAS.BIN (sd/sdt.img) and the English pages.
   1. theme 0 of the file: banner tiles (VRAM 0x2E00), wallpaper names (VRAM 0x1400), its colours
   2. Opções -> Tema Visual cycles the names of the file; back in the list the new banner/wallpaper load
-  3. Idioma: the restart message, the settings byte flips
-  4. English (settings byte $c = 1 before the first folder read): browser, main menu, options, search
+  3. Idioma: bit 7 of the settings byte $d flips and the console restarts (reset vector)
+  4. English after that restart (same SRAM): browser, main menu, options, search, credits
   5. without TEMAS.BIN (sd.img): the four built-in colour themes, as before"""
 import struct
 import sys
 from pathlib import Path
 
 import emu3
+from unicorn.m68k_const import UC_M68K_REG_A7, UC_M68K_REG_PC, UC_M68K_REG_SR
 
 R = Path(__file__).resolve().parents[2]
 V3 = str(R / 'MDOS.ptbr.BIN')
@@ -44,6 +45,17 @@ def shows_theme(m, i):
     return tiles and names and m.cram[0] == cols[0] and m.cram[1] == cols[1]
 
 
+def reboot(sram):
+    """power cycle: a new machine with the same cart SRAM"""
+    m = emu3.MachineV3(V3, 'sd/sdt.img', logs.append)
+    m.mu.mem_write(0x100000, sram)
+    m.mu.reg_write(UC_M68K_REG_SR, 0x2700)
+    m.mu.reg_write(UC_M68K_REG_A7, 0x01000000)
+    m.mu.reg_write(UC_M68K_REG_PC, 0xFF5430)
+    m.run(60)
+    return m
+
+
 def options(m):
     m.press('c', after=200)                         # browser -> main menu
     m.press('down')
@@ -75,21 +87,22 @@ for _ in range(6):                                  # 1 -> 2 .. 6 -> 0 (7 themes
     m.press('a', after=120)
 check('Tema Visual:   PADR*O' in m.text(), 'options: wraps around after the last theme')
 m.press('down')
-m.press('a', after=200)                             # Idioma
-t = '\n'.join(lines(m))
-check('Reinicie o console / Restart the console' in t, 'language: restart message')
-check(m.mu.mem_read(settings(m) + 0xC, 1)[0] == 1, 'language byte = 1')
-m.press('a', after=200)
-check('Idioma:        ENGLISH' in m.text(), 'options: ENGLISH shown')
+m.mu.mem_write(0, struct.pack('>II', 0x01000000, 0x100) + bytes(0xF8) + bytes.fromhex('60fe'))  # boot ROM vectors
+m.press('a', after=200)                             # Idioma: saves and restarts the console
+pc = m.mu.reg_read(UC_M68K_REG_PC)
+check(pc in (0x100, 0x102), f'language: the console restarts through the reset vector (pc={pc:06X})')
+check(m.mu.mem_read(settings(m) + 0xD, 1)[0] == 0x80, 'settings byte $d: bit 7 (English) + theme 0')
+sram = bytes(m.mu.mem_read(0x100000, 0x40000))
 
-# 4. English
-m = emu3.boot(V3, 'sd/sdt.img', frames=60, log=logs.append)
-m.mu.mem_write(settings(m) + 0xC, bytes([1, 4]))    # English, theme 4 (OUTRUN)
+# 4. English: the console after that restart (same SRAM: theme 0 + English), then theme 4
+m = reboot(sram)
 m.press('a', after=250)
 t = '\n'.join(lines(m))
 print(t)
-check('A: file     START: replay   C: menu' in t and 'Page' in t, 'English browser (help line, page counter)')
-check(shows_theme(m, 4), 'theme 4 (OUTRUN) at boot')
+check('A: file     START: replay   C: menu' in t and '1/1' in lines(m)[-1], 'English browser (help line, page counter)')
+check(shows_theme(m, 0), 'theme 0 kept')
+m.mu.mem_write(settings(m) + 0xD, bytes([0x84]))   # English, theme 4 (OUTRUN): next time the list loads
+m.mu.mem_write(0xFFC5A4, bytes(2))
 m.press('c', after=200)
 t = '\n'.join(lines(m))
 print(t)
@@ -99,15 +112,19 @@ t = '\n'.join(lines(m))
 print(t)
 check('Theme:         OUTRUN' in t and 'Language:      ENGLISH' in t and 'Game Region:' in t, 'English options')
 m.press('b', after=200)
-m.press('up')
-m.press('a', after=250)                             # search
+m.press('b', after=300)
+check(shows_theme(m, 4), 'theme 4 (OUTRUN) with the English pages')
+m.press('c', after=200)
+m.press('a', after=250)                             # search (first item)
 t = '\n'.join(lines(m))
 print(t)
 check('By Name (type it)' in t, 'English search page')
-m.press('b', after=200)
+m = reboot(sram)                                    # credits, from a fresh main menu
+m.press('a', after=250)
+m.press('c', after=200)
 for _ in range(7):
     m.press('down')
-m.press('a', after=250)                             # credits
+m.press('a', after=250)
 t = '\n'.join(lines(m))
 print(t)
 check('Controls:' in t and 'B - back' in t, 'English credits page')

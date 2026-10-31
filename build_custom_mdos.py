@@ -276,7 +276,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.28'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.29'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -384,12 +384,13 @@ def build_custom_mdos():
     blk2.b_s(0x66, 'oe_fail')
     blk2.emit(0x7000)                               # moveq #0, d0
     blk2.emit(0x1017)                               # move.b (a7), d0 (page - 1)
-    # English (settings byte $c = 1): pages 1 and 2 have English copies 3 pages further on
+    # English (bit 7 of the theme byte $d: the cart SRAM keeps only the odd byte of each word): pages 1
+    # and 2 have English copies 3 pages further on
     blk2.emit(0x0c00, 0x0001)                       # cmpi.b #1, d0
     blk2.b_s(0x62, 'oe_pt')                         # bhi.s
     blk2.emit(0x2079, 0x00ff, 0xc47a)               # movea.l $ffc47a.l, a0 (settings)
-    blk2.emit(0x4a28, 0x000c)                       # tst.b $c(a0) (language)
-    blk2.b_s(0x67, 'oe_pt')
+    blk2.emit(0x4a28, 0x000d)                       # tst.b $d(a0) (bit 7: English)
+    blk2.b_s(0x6a, 'oe_pt')                         # bpl.s
     blk2.emit(0x5640)                               # addq.w #3, d0
     blk2.label('oe_pt')
     blk2.emit(0xc0fc, 0x0007)                       # mulu.w #7, d0
@@ -795,8 +796,8 @@ def build_custom_mdos():
     ext.label('pagePal')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w
     ext.emit(0x4eb9, 0x00ff, 0x30a0)                # jsr $ff30a0.l (gSetPal)
-    ext.emit(0x4878, 26)                            # pea.l 26.w (y)
-    ext.emit(0x4878, 18)                            # pea.l 18.w (x)
+    ext.emit(0x4878, 26)                            # pea.l 26.w (y: over the page counter)
+    ext.emit(0x4878, 33)                            # pea.l 33.w (x)
     ext.emit(0x4879, 0x00ff, 0xc5a8)                # pea.l $ffc5a8.l ("[*]" or empty)
     ext.emit(0x4eb9, 0x00ff, 0x3556)                # jsr $ff3556.l (gPrintAt)
     ext.emit(0x4878, 3)                             # pea.l 3.w (y: the help line under the banner)
@@ -1464,6 +1465,8 @@ def build_custom_mdos():
     # Strings
     ext.label('str_empty')
     ext.emit_str(b'')
+    ext.label('str_slash')
+    ext.emit_str(b'/')
 
     ext.label('str_banner_tiles')
     ext.emit_str(bytes(range(0x88, 0x98)))
@@ -1512,10 +1515,6 @@ def build_custom_mdos():
     ext.emit_str(b'Descompacte o arquivo ROM', b'ROM file must be unzipped')
 
     # Browser UI
-    ext.label('str_page')
-    ext.emit_str(b'P\x83g. ', b'Page ')
-    ext.label('str_of')
-    ext.emit_str(b' de ', b' of ')
     ext.label('str_no_files')
     ext.emit_str(b'Pasta vazia', b'Empty folder')
 
@@ -1731,6 +1730,7 @@ def build_custom_mdos():
     opt_asm.emit(0x2079, 0x00ff, 0xc47a)                # movea.l $ffc47a.l, a0 (settings)
     opt_asm.emit(0x7000)                                # moveq #0, d0
     opt_asm.emit(0x1028, 0x000d)                        # move.b $d(a0), d0 (theme)
+    opt_asm.emit(0x0200, 0x007f)                        # andi.b #$7f, d0 (bit 7 = language)
     opt_asm.emit(0xed88)                                # lsl.l #6, d0
     opt_asm.emit(0xd097)                                # add.l (a7), d0
     opt_asm.emit(0x5280)                                # addq.l #1, d0 (after the name sector)
@@ -1760,8 +1760,8 @@ def build_custom_mdos():
     opt_asm.emit(0x50f9, 0x00ff, 0xc5ad)                # st $ffc5ad.l
     opt_asm.label('dirStubCall')
     opt_asm.emit(0x2079, 0x00ff, 0xc47a)                # movea.l $ffc47a.l, a0 (settings)
-    opt_asm.emit(0x4a28, 0x000c)                        # tst.b $c(a0) (language)
-    opt_asm.b_s(0x67, 'ds_go')
+    opt_asm.emit(0x4a28, 0x000d)                        # tst.b $d(a0) (bit 7: English)
+    opt_asm.b_s(0x6a, 'ds_go')                          # bpl.s
     opt_asm.emit(0x303c, 0x0500)                        # move.w #$0500, d0 (page 6, entry 0)
     opt_asm.jsr_label('ovlEnter')
     opt_asm.label('ds_go')
@@ -2052,8 +2052,8 @@ def build_custom_mdos():
     ovl.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
     ovl.emit(0x4e75)                                # rts
 
-    # Options. Settings word $c: byte $c = language (0 Portuguese, 1 English: the English pages load
-    # on the next boot), byte $d = theme: a theme of /EDMD/TEMAS.BIN (names read into $ffd600 here;
+    # Options. Settings byte $d (the SRAM keeps only odd bytes): bit 7 = English (the English pages
+    # load at boot: changing it restarts the console), bits 0-6 = theme: a theme of /EDMD/TEMAS.BIN (names read into $ffd600 here;
     # the new banner and wallpaper load when the menu closes) or, without that file, one of the
     # four built-in colour sets. d3 = 1: the theme changed.
     ovl.label('ovl_options')
@@ -2150,8 +2150,8 @@ def build_custom_mdos():
     # Option 5: language
     ovl.lea_label(0, 'str_opt_lang')
     ovl.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
-    ovl.emit(0x4a2a, 0x000c)                    # tst.b $c(a2)
-    ovl.b_s(0x66, 'opt_lg_en')
+    ovl.emit(0x4a2a, 0x000d)                    # tst.b $d(a2) (bit 7: English)
+    ovl.b_s(0x6b, 'opt_lg_en')                  # bmi.s
     ovl.pea_label('str_lang_pt')
     ovl.b_s(0x60, 'opt_lg_copy')
     ovl.label('opt_lg_en')
@@ -2189,25 +2189,29 @@ def build_custom_mdos():
     ovl.b_s(0x65, 'opt_tt_set')                 # bcs.s
     ovl.emit(0x7000)                            # moveq #0, d0
     ovl.label('opt_tt_set')
-    ovl.emit(0x1540, 0x000d)                    # move.b d0, $d(a2)
+    ovl.bsr_w('opt_set_theme')
     ovl.emit(0x7601)                            # moveq #1, d3 (load it when the menu closes)
     ovl.bra_w('opt_refresh')
     ovl.label('opt_tt_own')
     ovl.emit(0x0240, 0x0003)                    # andi.w #3, d0
-    ovl.emit(0x1540, 0x000d)                    # move.b d0, $d(a2)
+    ovl.bsr_w('opt_set_theme')
     ovl.jsr_label('applyTheme')
     ovl.bra_w('opt_refresh')
+    ovl.label('opt_set_theme')                  # theme d0 into bits 0-6 of $d, the language bit stays
+    ovl.emit(0x022a, 0x0080, 0x000d)            # andi.b #$80, $d(a2)
+    ovl.emit(0x812a, 0x000d)                    # or.b d0, $d(a2)
+    ovl.emit(0x4e75)                            # rts
 
     ovl.label('opt_tog_chk5')
     ovl.emit(0x0c40, 0x0005)                    # cmpi.w #5, d0 (5 = language)
     ovl.bne_w('opt_tog_bool')
-    ovl.emit(0x0a2a, 0x0001, 0x000c)            # eori.b #1, $c(a2)
-    ovl.emit(0x42a7)                            # clr.l -(a7)
-    ovl.emit(0x4878, 0x0001)                    # pea.l $1.w
-    ovl.pea_label('menu_restart')               # "restart the console"
-    ovl.emit(0x4eb9, 0x00ff, 0x4834)            # jsr $ff4834.l (menuDraw)
-    ovl.emit(0x4fef, 0x000c)                    # lea.l $c(a7), a7
-    ovl.bra_w('opt_refresh')
+    ovl.emit(0x0a2a, 0x0080, 0x000d)            # eori.b #$80, $d(a2) (saved: the settings live in SRAM)
+    # the English text goes in at boot: restart the console like the reset button does (the cart's
+    # boot ROM is at 0 while the OS runs: its vectors load MDOS.BIN again)
+    ovl.emit(0x46fc, 0x2700)                    # move.w #$2700, sr
+    ovl.emit(0x2e78, 0x0000)                    # movea.l $0.w, a7
+    ovl.emit(0x2078, 0x0004)                    # movea.l $4.w, a0
+    ovl.emit(0x4ed0)                            # jmp (a0)
 
     ovl.label('opt_tog_bool')
     ovl.emit(0x3004)                            # move.w d4, d0
@@ -2236,6 +2240,7 @@ def build_custom_mdos():
     ovl.label('opt_th_n')
     ovl.emit(0x7000)                            # moveq #0, d0
     ovl.emit(0x102a, 0x000d)                    # move.b $d(a2), d0
+    ovl.emit(0x0200, 0x007f)                    # andi.b #$7f, d0 (bit 7 = language)
     ovl.emit(0x4a41)                            # tst.w d1
     ovl.b_s(0x67, 'opt_th_ret')
     ovl.emit(0xb041)                            # cmp.w d1, d0
@@ -2273,14 +2278,6 @@ def build_custom_mdos():
 
     ovl_code_end = len(ovl.buf)
 
-    ovl.label('menu_restart')                       # menuDraw: title + one line (pointers)
-    ovl.emit_l(0, 0)
-    ovl.fixups.append((len(ovl.buf) - 8, 'str_restart_title', 'abs32'))
-    ovl.fixups.append((len(ovl.buf) - 4, 'str_restart', 'abs32'))
-    ovl.label('str_restart_title')
-    ovl.emit_str(b'Idioma / Language')
-    ovl.label('str_restart')
-    ovl.emit_str(b'Reinicie o console / Restart the console')
     ovl.label('str_lang_pt')
     ovl.emit_str(b'PT-BR')
     ovl.label('str_lang_en')
@@ -2507,11 +2504,12 @@ def build_custom_mdos():
     #     of up to 38 characters (was 32 + a second line for long names on 26-27).
     assert rom[0x0926:0x0928] == bytes.fromhex('7c03')
     rom[0x0927] = 5                                  # first list row (1.27: help row 3, blank row 4)
-    assert rom[0x09E2:0x09E6] == bytes.fromhex('48780001')
-    rom[0x09E5] = 26                                 # page counter row
+    assert rom[0x09E2:0x09EA] == bytes.fromhex('4878000148780002')
+    rom[0x09E5] = 27                                 # page counter: "x/y" on the file name bar (1.28),
+    rom[0x09E9] = 33                                 #   column 33; row 26 stays blank
     for off, old, new in ((0x0976, 0x02, 0x01), (0x09AA, 0x02, 0x01),     # name bar fills: 1 row high
                           (0x097E, 0x19, 0x1B), (0x09B2, 0x19, 0x1B),     #                 on row 27
-                          (0x0ABE, 0x20, 0x26), (0x0AC2, 0x19, 0x1B)):    # name: 38 characters, row 27
+                          (0x0ABE, 0x20, 0x1F), (0x0AC2, 0x19, 0x1B)):    # name: 31 characters, row 27
         assert rom[off:off + 4] == bytes.fromhex('487800%02x' % old), hex(off)
         rom[off + 3] = new
     assert rom[0x0AE8:0x0AEA] == bytes.fromhex('6330')
@@ -2598,8 +2596,8 @@ def build_custom_mdos():
 
     # I. Update inline code string pointers
     code_ptr_patches = [
-        (0x09EC, 0x00FF68D6, 'str_page'),
-        (0x0A10, 0x00FF68DC, 'str_of'),
+        (0x09EC, 0x00FF68D6, 'str_empty'),          # "x/y": no "Pág." (1.28)
+        (0x0A10, 0x00FF68DC, 'str_slash'),
         (0x0A66, 0x00FF68E1, 'str_no_files'),
         (0x3864, 0x00FF692D, 'str_flash_patch'),
         (0x3C5E, 0x00FF6955, 'str_raw_code'),

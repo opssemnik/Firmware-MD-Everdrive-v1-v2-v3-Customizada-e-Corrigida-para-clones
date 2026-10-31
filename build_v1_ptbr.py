@@ -26,7 +26,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.28'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.29'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     # /EDMD/V1EXT.BIN on the SD card
@@ -477,21 +477,23 @@ def main():
     # (1.27: help line on row 3, a blank row, list rows 5-25; folder changes clear rows 0-25)
     for ram, old, new in ((0xFF657E, '48780002', '48780005'),                    # first list row
                           (0xFF6656, '48780019', '4878001a'), (0xFF6798, '48780019', '4878001a'),
-                          (0xFF6258, '48780002', '48780001'), (0xFF625C, '48780024', '48780026'),
-                          (0xFF6260, '48780018', '4878001b'),                    # name clear: row 27, 38 wide
-                          (0xFF6276, '48780024', '48780026'), (0xFF627A, '48780018', '4878001b'),  # name
+                          (0xFF6258, '48780002', '48780001'), (0xFF625C, '48780024', '4878001f'),
+                          (0xFF6260, '48780018', '4878001b'),                    # name clear: row 27, 31 wide
+                          (0xFF6276, '48780024', '4878001f'), (0xFF627A, '48780018', '4878001b'),  # name
+                          # (1.28: the page counter "x/y" sits at the right of the name bar, row 26 blank)
                           (0xFF62DA, '6334', '6034'),                            # no second name line
-                          (0xFF64DC, '48780002', '48780001'), (0xFF64E4, '48780018', '4878001b'),  # bar
-                          (0xFF64FC, '48780017', '4878001a'), (0xFF653A, '2ebc00000017', '2ebc0000001a'),
-                          (0xFF6554, '48780017', '4878001a')):                   # page counter row 26
+                          (0xFF64DC, '48780002', '48780001'), (0xFF64E4, '48780018', '4878001b')):  # bar
         patch(ram, bytes.fromhex(old), bytes.fromhex(new))
     patch(0xFF64A8, bytes.fromhex('13fc000100ffe306'), jsr(syms['ramBrowserBanner']) + b'\x4e\x71')
-    # footer: "pág: x / y" in gold (the three prints push d4 = palette 2, set by ramPagePal, instead
-    # of 0) and the file name bar in the banner crimson (tile 1, palette 2) instead of grey
-    for ram in (0xFF6504, 0xFF6544, 0xFF655C):
-        patch(ram, bytes.fromhex('42a7'), bytes.fromhex('2f04'))       # clr.l -(sp) -> move.l d4,-(sp)
+    # footer: the file name bar in the banner crimson (tile 1, palette 2) instead of grey; the page
+    # counter: the three "pág: x / y" prints (fixed columns, row 23) -> ramPageCount ("x/y" in gold at
+    # the right end of the name bar). At 0xFF64FC the bar fill's 6 arguments are still on the stack,
+    # 0xFF6570 expects 16 more bytes (its lea pops 9 longs and reuses the 10th)
     patch(0xFF64EA, bytes.fromhex('48780002'), bytes.fromhex('48784001'))
     patch(0xFF64F4, bytes.fromhex('47f900ff8ed0'), jsr(syms['ramPagePal']))
+    disp = 0xFF6570 - (0xFF64FC + 10 + 2)
+    patch(0xFF64FC, bytes.fromhex('487800174878000142a73c03ccfc8619'),
+          jsr(syms['ramPageCount']) + bytes.fromhex('4feffff0') + struct.pack('>Hh', 0x6000, disp) + b'\x4e\x71')
     patch(0xFF693E, bytes.fromhex('303900ffe30c'), jsr(syms['ramBrowserC']))       # C: search
     patch(0xFF3FEC, bytes.fromhex('6100fd2e588f'), jsr(syms['ramCheatApply']))       # GG codes: START
     patch(0xFF5642, bytes.fromhex('303900a13002080000016' '7f4'), jsr(syms['ramEraseWait']) + bytes.fromhex('4e71') * 3)  # erase wait

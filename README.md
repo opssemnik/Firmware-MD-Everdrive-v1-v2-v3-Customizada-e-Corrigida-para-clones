@@ -10,8 +10,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
 | EverDrive-MD **v1 / v2** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
-| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `8918e81d816691b5f955fa2bfeb546c75769d9cfe48b3ab5e509626f10f1998b` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `7cf994f8c51c249ea3f31dd36103a29d35efcc03503a2f9746f815c14a1d5a1a` |
+| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `bb008216a28a0085904ddafa979cb0a76f1cf21dfd61c8ab7e6944329c19f353` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `8ce1435a83bd78e5631ef189c4fd05727d490ccb5ba62f31b04696adf83188b4` |
 
 **Releases** ([página de Releases](../../releases)): os firmwares e os temas:
 
@@ -109,7 +109,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema · Idioma. A versão do mod aparece no rodapé (**PT-BR 1.28**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema · Idioma. A versão do mod aparece no rodapé (**PT-BR 1.29**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -148,7 +148,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
 O tema fica em **Opções → Tema Visual** (o novo aparece ao voltar para a lista) e o idioma em
-**Opções → Idioma** (vale ao ligar o console de novo). Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.28**.
+**Opções → Idioma** (o console reinicia sozinho para trocar). Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.29**.
 
 ### Unbrick - recuperar v3 travado
 O OS v3 original do fabricante tem uma "proteção": ao iniciar um jogo num cartucho que ele não
@@ -245,11 +245,11 @@ python make_temas.py E:/EDMD/TEMAS.BIN
 ## Idioma / Language
 
 O mod pode mostrar tudo em **português** (padrão) ou em **inglês**: na v1 / v2 pelo item **Idioma** do
-menu principal (troca na hora), na v3 em **Opções → Idioma** (vale ao ligar o console de novo). A escolha
+menu principal (troca na hora), na v3 em **Opções → Idioma** (o console reinicia sozinho). A escolha
 fica salva no cartucho.
 
 *The mod can show everything in **English**: v1 / v2 main menu → "Idioma" (switches at once); v3
-"Opções" → "Idioma" (after a power cycle).*
+"Opções" → "Idioma" (the console restarts by itself).*
 
 ## Capas (box art)
 

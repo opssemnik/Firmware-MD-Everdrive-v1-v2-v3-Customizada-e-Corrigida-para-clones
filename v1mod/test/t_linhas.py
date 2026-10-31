@@ -1,5 +1,5 @@
-"""1.28 layout (v1 / v2 and v3, sd/sdbig.img): help line on row 3, row 4 blank, list rows 5-25 (21 per
-page), page counter row 26; going back from a full page to a short folder leaves row 25 empty"""
+"""1.29 layout (v1 / v2 and v3, sd/sdbig.img): help line on row 3, row 4 blank, list rows 5-25 (21 per
+page), rows 26 blank, file name + page counter "x/y" on row 27; going back from a full page to a short folder leaves row 25 empty"""
 import sys
 from pathlib import Path
 
@@ -35,11 +35,16 @@ for name, boot in (('v1', lambda: emu.boot(str(R / 'OS-V38-PTBR.BIN'), 'sd/sdbig
     m.press('a', after=250)                         # into /MUITOS
     r = rows(m)
     print('\n'.join(f'{k:2}|{l}' for k, l in enumerate(r)))
-    check('START' in r[3] and not r[4].strip() and 'JOGO01' in r[5] and 'JOGO21' in r[25] and '1' in r[26],
-          f'{name}: help row 3, blank row 4, list 5-25, page row 26')
+    check('START' in r[3] and not r[4].strip() and 'JOGO01' in r[5] and 'JOGO21' in r[25] and not r[26].strip()
+          and r[27].endswith('1/2') and 'JOGO01' in r[27], f'{name}: help 3, blank 4, list 5-25, blank 26, name + "1/2" on 27')
+    m.press('down', after=60)                       # the name is printed again: the counter stays
+    r = rows(m)
+    check('JOGO02' in r[27] and r[27].endswith('1/2'), f'{name}: cursor moved, name + counter on row 27')
+    m.screen(f'linhas_{name}.png')
     m.press('right', after=200)                     # page 2: 9 games, rows 14-25 empty
     r = rows(m)
-    check('JOGO22' in r[5] and 'JOGO30' in r[13] and not ''.join(r[14:26]).strip(), f'{name}: page 2, rows 14-25 empty')
+    check('JOGO22' in r[5] and 'JOGO30' in r[13] and not ''.join(r[14:27]).strip() and r[27].endswith('2/2'),
+          f'{name}: page 2, rows 14-26 empty, "2/2"')
     m.press('b', after=250)                         # back to the root
     r = rows(m)
     check(not r[25].strip() and 'MUITOS' in '\n'.join(r[5:12]), f'{name}: back in the root, row 25 empty')
