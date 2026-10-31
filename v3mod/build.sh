@@ -1,6 +1,7 @@
 #!/bin/bash
 # Compiles the v3 search overlay inside WSL with the rootless m68k toolchain (~/m68k/root).
-# usage: build.sh CLS_BANNER   (run by build_custom_mdos.py: address of the mod's clsBanner)
+# usage: build.sh CLS_BANNER [en]   (run by build_custom_mdos.py: address of the mod's clsBanner;
+#        "en" builds the English page, build/search_en.*)
 set -euo pipefail
 R=$HOME/m68k/root
 export PATH=$R/usr/bin:$PATH
@@ -13,9 +14,11 @@ mkdir -p build
 CFLAGS="-m68000 -Os -ffreestanding -fno-pic -fno-pie -fomit-frame-pointer -fno-asynchronous-unwind-tables \
  -fno-tree-loop-distribute-patterns -fno-store-merging -fno-common -Wall -Wno-pointer-sign -Werror"
 
-$CC $CFLAGS -DCLS_BANNER=$1 -c search.c -o build/search.o
-$CC -m68000 -nostdlib -no-pie -static -T link.ld -Wl,-Map=build/search.map -Wl,--no-warn-rwx-segments -Wl,--build-id=none \
-    build/search.o -o build/search.elf
-${P}objcopy -O binary -j .ovl build/search.elf build/search.bin
-${P}objdump -h build/search.elf > build/search.sections
-${P}objdump -d --no-show-raw-insn build/search.elf > build/search.lst
+O=search; D=
+if [ "${2:-}" = en ]; then O=search_en; D=-DLANG_EN; fi
+$CC $CFLAGS -DCLS_BANNER=$1 $D -c search.c -o build/$O.o
+$CC -m68000 -nostdlib -no-pie -static -T link.ld -Wl,-Map=build/$O.map -Wl,--no-warn-rwx-segments -Wl,--build-id=none \
+    build/$O.o -o build/$O.elf
+${P}objcopy -O binary -j .ovl build/$O.elf build/$O.bin
+${P}objdump -h build/$O.elf > build/$O.sections
+${P}objdump -d --no-show-raw-insn build/$O.elf > build/$O.lst

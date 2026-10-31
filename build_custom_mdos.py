@@ -12,6 +12,7 @@ class Asm68k:
         self.buf = bytearray()
         self.labels = {}
         self.fixups = []
+        self.en = []                    # (address, English text) of the strings emitted with one
 
     @property
     def pc(self):
@@ -35,10 +36,17 @@ class Asm68k:
         if len(self.buf) % 2 != 0:
             self.buf.append(0)
 
-    def emit_str(self, s_bytes):
+    def emit_str(self, s_bytes, en=None):
+        """en: the English text; the room reserved is the longer of the two (the English pages
+        overwrite the Portuguese string in place)"""
         if isinstance(s_bytes, str):
             s_bytes = s_bytes.encode('latin1')
-        self.emit_b(s_bytes + b'\x00')
+        pad = 0
+        if en is not None:
+            assert all(0x20 <= c < 0x7F for c in en), en
+            self.en.append((self.pc, en))
+            pad = max(0, len(en) - len(s_bytes))
+        self.emit_b(s_bytes + b'\x00' * (1 + pad))
 
     def bsr_w(self, target_label):
         self.emit(0x6100, 0x0000)
@@ -268,25 +276,26 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.26'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.27'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
 V3MOD = Path(__file__).resolve().parent / 'v3mod'
 
 
-def build_search(cls_banner):
-    """overlay page 2: v3mod/search.c compiled in WSL (rootless m68k toolchain, as the v1 build)"""
+def build_search(cls_banner, en=False):
+    """overlay page 2 (en: page 5): v3mod/search.c compiled in WSL (rootless m68k toolchain, as the v1 build)"""
     p = str(V3MOD / 'build.sh').replace('\\', '/')
-    r = subprocess.run(['wsl', '-d', 'Debian', '--', 'bash', f'/mnt/{p[0].lower()}{p[2:]}', hex(cls_banner)],
-                       capture_output=True, text=True)
+    r = subprocess.run(['wsl', '-d', 'Debian', '--', 'bash', f'/mnt/{p[0].lower()}{p[2:]}', hex(cls_banner)]
+                       + (['en'] if en else []), capture_output=True, text=True)
     if r.returncode:
         print(r.stdout, r.stderr)
         sys.exit('search overlay: compile failed')
-    data = (V3MOD / 'build' / 'search.bin').read_bytes()
+    name = 'search_en' if en else 'search'
+    data = (V3MOD / 'build' / f'{name}.bin').read_bytes()
     assert len(data) <= 7 * 512, f'search overlay too large: {len(data)}'
-    lst = (V3MOD / 'build' / 'search.lst').read_text()
-    assert '.data' not in (V3MOD / 'build' / 'search.sections').read_text(), 'the overlay has no RAM'
+    lst = (V3MOD / 'build' / f'{name}.lst').read_text()
+    assert '.data' not in (V3MOD / 'build' / f'{name}.sections').read_text(), 'the overlay has no RAM'
     bad = re.findall(r'\b(extbl|mulsl|mulul|divsl|divul|divsll|divull|bf[a-z]+|cas2?|chk2|cmp2|rtd|pack|unpk)\b', lst)
     assert not bad, f'non-68000 instructions emitted: {set(bad)}'
     rmw = re.findall(r'\b(?:clr|tst|not|negx?|bset|bclr|bchg|tas|addq|subq|or|and|eor)[bwl]?\b[^\n]*\bc0000[0-7]\b', lst)
@@ -375,6 +384,14 @@ def build_custom_mdos():
     blk2.b_s(0x66, 'oe_fail')
     blk2.emit(0x7000)                               # moveq #0, d0
     blk2.emit(0x1017)                               # move.b (a7), d0 (page - 1)
+    # English (settings byte $c = 1): pages 1 and 2 have English copies 3 pages further on
+    blk2.emit(0x0c00, 0x0001)                       # cmpi.b #1, d0
+    blk2.b_s(0x62, 'oe_pt')                         # bhi.s
+    blk2.emit(0x2079, 0x00ff, 0xc47a)               # movea.l $ffc47a.l, a0 (settings)
+    blk2.emit(0x4a28, 0x000c)                       # tst.b $c(a0) (language)
+    blk2.b_s(0x67, 'oe_pt')
+    blk2.emit(0x5640)                               # addq.w #3, d0
+    blk2.label('oe_pt')
     blk2.emit(0xc0fc, 0x0007)                       # mulu.w #7, d0
     blk2.emit(0x0640, 0x0040)                       # addi.w #$40, d0 (after the 32 KB already in RAM)
     blk2.emit(0x2f00)                               # move.l d0, -(a7)
@@ -583,7 +600,8 @@ def build_custom_mdos():
     ext.emit(0x42b9, 0x00ff, 0xc5a0)                # clr.l $ffc5a0.l (L/R flags + cursor)
     ext.emit(0x4279, 0x00ff, 0xc5a4)                # clr.w $ffc5a4.l (banner, wallpaper: not tried yet)
     ext.emit(0x42b9, 0x00ff, 0xc5a8)                # clr.l $ffc5a8.l (search results tag)
-    ext.emit(0x4239, 0x00ff, 0xc5ac)                # clr.b $ffc5ac.l (search result for the browser)
+    ext.emit(0x4279, 0x00ff, 0xc5ac)                # clr.w $ffc5ac.l (search result for the browser,
+                                                    #   $ffc5ad: first folder read of this boot)
     # Fixed VDP table addresses (the cart BIOS picks them; the v1 OS uses these): window 0xB000,
     # sprites 0xBC00, H scroll 0xB800, then zero the H scroll table and sprite 0. VRAM below 0xA000
     # is then free for the wallpaper tiles.
@@ -661,10 +679,9 @@ def build_custom_mdos():
     ext.label('loadWallpaper')
     ext.emit(0x48e7, 0x1820)                        # movem.l d3-d4/a2, -(a7)
     ext.emit(0x13fc, 0x0001, 0x00ff, 0xc5a5)        # move.b #1, $ffc5a5.l
-    ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.pea_label('str_wall_path')
-    ext.emit(0x4eb9, 0x00ff, 0x2f48)                # jsr $ff2f48.l (fatOpenFileByName)
-    ext.emit(0x508f)                                # addq.l #8, a7
+    ext.lea_label(0, 'str_wall_path')
+    ext.emit(0x7008)                                # moveq #8, d0 (wallpaper: sector 8 of a theme)
+    ext.jsr_label('openArt')
     ext.emit(0x4a00)                                # tst.b d0
     ext.bne_w('lw_ret')
     ext.bsr_w('lw_read')
@@ -1005,10 +1022,9 @@ def build_custom_mdos():
     ext.label('loadTileFile')
     ext.emit(0x48e7, 0x1030)                        # movem.l d3/a2-a3, -(a7)
     ext.emit(0x2649)                                # movea.l a1, a3
-    ext.emit(0x42a7)                                # clr.l -(a7)
-    ext.emit(0x2f1b)                                # move.l (a3)+, -(a7) (path)
-    ext.emit(0x4eb9, 0x00ff, 0x2f48)                # jsr $ff2f48.l (fatOpenFileByName)
-    ext.emit(0x508f)                                # addq.l #8, a7
+    ext.emit(0x205b)                                # movea.l (a3)+, a0 (path)
+    ext.emit(0x7000)                                # moveq #0, d0 (banner: sector 0 of a theme)
+    ext.jsr_label('openArt')
     ext.emit(0x4a00)                                # tst.b d0
     ext.b_s(0x66, 'ltf_ret')
     ext.emit(0x4878, 0x0001)                        # pea.l $1.w
@@ -1430,6 +1446,7 @@ def build_custom_mdos():
         'str_opt_sram',
         'str_opt_rst',
         'str_opt_theme',
+        'str_opt_lang',
     ])
 
     emit_menu_table('menu_no_recent', ['str_recent_title', 'str_no_recent'])
@@ -1470,75 +1487,77 @@ def build_custom_mdos():
 
     # File & Main Menus
     ext.label('str_file_menu')
-    ext.emit_str(b'Menu Arquivo')
+    ext.emit_str(b'Menu Arquivo', b'File Menu')
     ext.label('str_load_cheats')
-    ext.emit_str(b'Carregar Cheats')
+    ext.emit_str(b'Carregar Cheats', b'Load Cheats')
     ext.label('str_hex_view')
-    ext.emit_str(b'Ver em Hex')
+    ext.emit_str(b'Ver em Hex', b'Hex View')
     ext.label('str_cancel')
-    ext.emit_str(b'Cancelar')
+    ext.emit_str(b'Cancelar', b'Cancel')
     ext.label('str_file_to_sram')
-    ext.emit_str(b' Arquivo -> SRAM ')
+    ext.emit_str(b' Arquivo -> SRAM ', b' File -> SRAM ')
     ext.label('str_sram_to_file')
-    ext.emit_str(b' SRAM -> Arquivo ')
+    ext.emit_str(b' SRAM -> Arquivo ', b' SRAM -> File ')
     ext.label('str_load_start')
-    ext.emit_str(b'Carregar e Jogar')
+    ext.emit_str(b'Carregar e Jogar', b'Load and Play')
     ext.label('str_load_only')
-    ext.emit_str(b'S\x86 Carregar')
+    ext.emit_str(b'S\x86 Carregar', b'Load Only')
     ext.label('str_cheats_play')
-    ext.emit_str(b'Jogar com Cheats')
+    ext.emit_str(b'Jogar com Cheats', b'Play with Cheats')
     ext.label('str_add_fav')
-    ext.emit_str(b'Favoritar Jogo')
+    ext.emit_str(b'Favoritar Jogo', b'Add to Favorites')
     ext.label('str_rom_info')
-    ext.emit_str(b'Info da ROM')
+    ext.emit_str(b'Info da ROM', b'ROM Info')
     ext.label('str_unzip_rom')
-    ext.emit_str(b'Descompacte o arquivo ROM')
+    ext.emit_str(b'Descompacte o arquivo ROM', b'ROM file must be unzipped')
 
     # Browser UI
     ext.label('str_page')
-    ext.emit_str(b'P\x83g. ')
+    ext.emit_str(b'P\x83g. ', b'Page ')
     ext.label('str_of')
-    ext.emit_str(b' de ')
+    ext.emit_str(b' de ', b' of ')
     ext.label('str_no_files')
-    ext.emit_str(b'Pasta vazia')
+    ext.emit_str(b'Pasta vazia', b'Empty folder')
 
     # Cheats UI
     ext.label('str_apply_codes_q')
-    ext.emit_str(b'Aplicar c\x86digos?')
+    ext.emit_str(b'Aplicar c\x86digos?', b'Apply codes?')
     ext.label('str_apply')
-    ext.emit_str(b'Aplicar')
+    ext.emit_str(b'Aplicar', b'Apply')
     ext.label('str_modify')
-    ext.emit_str(b'Editar')
+    ext.emit_str(b'Editar', b'Modify')
     ext.label('str_flash_patch')
-    ext.emit_str(b'Aplicando cheats...')
+    ext.emit_str(b'Aplicando cheats...', b'Applying cheats...')
     ext.label('str_raw_code')
-    ext.emit_str(b'C\x86d. RAW')
+    ext.emit_str(b'C\x86d. RAW', b'RAW Code')
     ext.label('str_gg_code')
-    ext.emit_str(b'C\x86d. GG')
+    ext.emit_str(b'C\x86d. GG', b'GG Code')
     ext.label('str_cheats_menu')
-    ext.emit_str(b'Menu de Cheats')
+    ext.emit_str(b'Menu de Cheats', b'Cheats Menu')
 
     # Options Menu
     ext.label('str_opt_title')
-    ext.emit_str(b'Op\x80\x82es')
+    ext.emit_str(b'Op\x80\x82es', b'Options')
     ext.label('str_opt_region')
-    ext.emit_str(b'Regi\x81o Jogo:   %%%%%%%')
+    ext.emit_str(b'Regi\x81o Jogo:   %%%%%%%', b'Game Region:   %%%%%%%')
     ext.label('str_opt_megakey')
     ext.emit_str(b'MegaKey:       %%%    ')
     ext.label('str_opt_sram')
-    ext.emit_str(b'Backup SRAM:   %%%    ')
+    ext.emit_str(b'Backup SRAM:   %%%    ', b'SRAM Backup:   %%%    ')
     ext.label('str_opt_rst')
-    ext.emit_str(b'Reset p/ Jogo: %%%    ')
+    ext.emit_str(b'Reset p/ Jogo: %%%    ', b'Reset to Game: %%%    ')
     ext.label('str_opt_theme')
-    ext.emit_str(b'Tema Visual:   %%%%%%%')
+    ext.emit_str(b'Tema Visual:   %%%%%%%%%%', b'Theme:         %%%%%%%%%%')
+    ext.label('str_opt_lang')
+    ext.emit_str(b'Idioma:        %%%%%%%', b'Language:      %%%%%%%')
     ext.label('str_world_7')
-    ext.emit_str(b'MUNDO  ')
+    ext.emit_str(b'MUNDO  ', b'WORLD  ')
     ext.label('str_off_7')
-    ext.emit_str(b'DESL   ')
+    ext.emit_str(b'DESL   ', b'OFF    ')
     ext.label('str_on_7')
-    ext.emit_str(b'LIG    ')
+    ext.emit_str(b'LIG    ', b'ON     ')
     ext.label('str_thm_0')
-    ext.emit_str(b'PADR\x87O ')
+    ext.emit_str(b'PADR\x87O ', b'DEFAULT')
     ext.label('str_thm_1')
     ext.emit_str(b'RG POA ')
     ext.label('str_thm_2')
@@ -1548,100 +1567,100 @@ def build_custom_mdos():
 
     # Main Menu, Recently Played, Favorites, Random Game
     ext.label('str_mm_title')
-    ext.emit_str(b'Menu Principal')
+    ext.emit_str(b'Menu Principal', b'Main Menu')
     ext.label('str_recent_title')
-    ext.emit_str(b'Jogos Recentes')
+    ext.emit_str(b'Jogos Recentes', b'Recent Games')
     ext.label('str_clear_recent')
-    ext.emit_str(b'[ LIMPAR RECENTES ]')
+    ext.emit_str(b'[ LIMPAR RECENTES ]', b'[ CLEAR RECENTS ]')
     ext.label('ir_exts')                            # isRomRec: 1 marker + lower-case extension
     for e in ('bin', 'md', 'gen', 'smd', 'sms', '32x'):
         ext.emit_l(int.from_bytes(b'\x01' + e.encode(), 'big'))
     ext.label('str_no_recent')
-    ext.emit_str(b'Nenhum jogo recente')
+    ext.emit_str(b'Nenhum jogo recente', b'No recent games')
     ext.label('str_fav_title')
-    ext.emit_str(b'Favoritos')
+    ext.emit_str(b'Favoritos', b'Favorites')
     ext.label('str_no_fav')
-    ext.emit_str(b'Nenhum favorito salvo')
+    ext.emit_str(b'Nenhum favorito salvo', b'No favorites saved')
     ext.label('str_fav_saved')
-    ext.emit_str(b'Salvo nos Favoritos!')
+    ext.emit_str(b'Salvo nos Favoritos!', b'Saved to Favorites!')
     ext.label('str_rand_title')
-    ext.emit_str(b'Jogo Aleat\x86rio')
+    ext.emit_str(b'Jogo Aleat\x86rio', b'Random Game')
     ext.label('str_mm_cheats')
     ext.emit_str(b'Cheats')
     ext.label('str_help')                           # browser, row 3 (pagePal)
-    ext.emit_str(b'A: arquivo  START: repetir  C: menu')
+    ext.emit_str(b'A: arquivo  START: repetir  C: menu', b'A: file     START: replay   C: menu')
     ext.label('str_mm_search')
-    ext.emit_str(b'Buscar em Todas as Pastas')
+    ext.emit_str(b'Buscar em Todas as Pastas', b'Search All Folders')
     ext.label('str_mm_devinfo')
-    ext.emit_str(b'Info Sistema')
+    ext.emit_str(b'Info Sistema', b'System Info')
     ext.label('str_mm_about')
-    ext.emit_str(b'Cr\x84ditos')
+    ext.emit_str(b'Cr\x84ditos', b'Credits')
 
     # System Information
     ext.label('str_sys_info')
-    ext.emit_str(b'Info do Sistema')
+    ext.emit_str(b'Info do Sistema', b'System Info')
     ext.label('str_cpld_ver')
-    ext.emit_str(b'Vers\x81o CPLD:')
+    ext.emit_str(b'Vers\x81o CPLD:', b'CPLD Version:')
     ext.label('str_bios_ver')
-    ext.emit_str(b'Vers\x81o BIOS:')
+    ext.emit_str(b'Vers\x81o BIOS:', b'BIOS Version:')
     ext.label('str_os_ver')
-    ext.emit_str(b'Vers\x81o OS:')
+    ext.emit_str(b'Vers\x81o OS:', b'OS Version:')
     ext.label('str_mod_version')
     ext.emit_str(('PT-BR ' + MOD_VERSION).encode())
     ext.label('str_mk_mode')
-    ext.emit_str(b'Modo MegaKey:')
+    ext.emit_str(b'Modo MegaKey:', b'MegaKey Mode:')
     ext.label('str_sys_type')
-    ext.emit_str(b'Tipo Sistema:')
+    ext.emit_str(b'Tipo Sistema:', b'System Type:')
     ext.label('str_asm_date')
-    ext.emit_str(b'Data Build:')
+    ext.emit_str(b'Data Build:', b'Build Date:')
     ext.label('str_asm_time')
-    ext.emit_str(b'Hora Build:')
+    ext.emit_str(b'Hora Build:', b'Build Time:')
 
     # Status & Error Messages
     ext.label('str_fat_init')
-    ext.emit_str(b'Iniciando FAT...')
+    ext.emit_str(b'Iniciando FAT...', b'FAT init...')
     ext.label('str_err_hdr')
-    ext.emit_str(b'ERRO:')
+    ext.emit_str(b'ERRO:', b'ERROR:')
     ext.label('str_err_rom_large')
-    ext.emit_str(b'Arquivo ROM muito grande')
+    ext.emit_str(b'Arquivo ROM muito grande', b'ROM file is too big')
     ext.label('str_err_sd_io')
-    ext.emit_str(b'Erro de leitura/escrita SD')
+    ext.emit_str(b'Erro de leitura/escrita SD', b'SD read/write error')
     ext.label('str_err_no_fat')
-    ext.emit_str(b'Sistema FAT n\x81o encontrado')
+    ext.emit_str(b'Sistema FAT n\x81o encontrado', b'FAT file system not found')
     ext.label('str_err_fat')
-    ext.emit_str(b'Erro no sistema FAT')
+    ext.emit_str(b'Erro no sistema FAT', b'FAT file system error')
     ext.label('str_err_not_loaded')
-    ext.emit_str(b'Nenhum jogo carregado')
+    ext.emit_str(b'Nenhum jogo carregado', b'No game loaded')
     ext.label('str_sram_save')
-    ext.emit_str(b'Salvando SRAM...')
+    ext.emit_str(b'Salvando SRAM...', b'Saving SRAM...')
     ext.label('str_sram_load')
-    ext.emit_str(b'Carregando SRAM...')
+    ext.emit_str(b'Carregando SRAM...', b'Loading SRAM...')
     ext.label('str_reg_patch')
-    ext.emit_str(b'Aplicando regi\x81o...')
+    ext.emit_str(b'Aplicando regi\x81o...', b'Region patch...')
     ext.label('str_rom_type')
-    ext.emit_str(b'Tipo ROM: ')
+    ext.emit_str(b'Tipo ROM: ', b'ROM type: ')
     ext.label('str_unknown_cap')
-    ext.emit_str(b'Desconhecido')
+    ext.emit_str(b'Desconhecido', b'Unknown')
     ext.label('str_rom_reg')
-    ext.emit_str(b'Regi\x81o ROM: ')
+    ext.emit_str(b'Regi\x81o ROM: ', b'ROM region: ')
     ext.label('str_world_5')
-    ext.emit_str(b'MUNDO')
+    ext.emit_str(b'MUNDO', b'WORLD')
     ext.label('str_unknown_up')
-    ext.emit_str(b'DESCONHECIDO')
+    ext.emit_str(b'DESCONHECIDO', b'UNKNOWN')
     ext.label('str_erase')
-    ext.emit_str(b'Apagando... 0x')
+    ext.emit_str(b'Apagando... 0x', b'Erasing... 0x')
     ext.label('str_read_file')
-    ext.emit_str(b'Lendo arquivo...')
+    ext.emit_str(b'Lendo arquivo...', b'Reading file...')
     ext.label('str_dont_turn_off')
-    ext.emit_str(b'  !!!N\x87O DESLIGUE O VIDEOGAME!!!')
+    ext.emit_str(b'  !!!N\x87O DESLIGUE O VIDEOGAME!!!', b'   !!!DO NOT TURN IT OFF!!!')
     ext.label('str_done')
-    ext.emit_str(b'Pronto!')
+    ext.emit_str(b'Pronto!', b'Done!')
     ext.label('str_usb_mode')
-    ext.emit_str(b'Modo USB')
+    ext.emit_str(b'Modo USB', b'USB Mode')
     ext.label('str_cfg_reset')
-    ext.emit_str(b'Configura\x80\x82es restauradas')
+    ext.emit_str(b'Configura\x80\x82es restauradas', b'Settings were reset')
     ext.label('str_press_key')
-    ext.emit_str(b'Pressione qualquer bot\x81o')
+    ext.emit_str(b'Pressione qualquer bot\x81o', b'Press any button')
 
     # =========================================================================
     # Block 5: optionsMenu_v2 in-place at 0xFF49B6..0xFF4B52 (412 bytes)
@@ -1689,6 +1708,68 @@ def build_custom_mdos():
     opt_asm.dbeq(0, 'ir_cmp')
     opt_asm.label('ir_ret')
     opt_asm.emit(0x4e75)                                # rts
+
+    # openArt(a0 = path, d0.l = sector inside a theme): BANNER.ART and WALL.ART come from the chosen
+    # theme of /EDMD/TEMAS.BIN (make_temas.py: theme t at sector 1 + t * 64, wallpaper at +8) when
+    # that file exists, else from their own files; anything else is just opened. d0.b = 0: open.
+    opt_asm.label('openArt')
+    opt_asm.emit(0xb1fc, 0, 0)                          # cmpa.l #str_wall_path, a0
+    opt_asm.fixups.append((len(opt_asm.buf) - 4, 'str_wall_path', 'abs32'))
+    opt_asm.b_s(0x67, 'oa_theme')
+    opt_asm.emit(0xb1fc, 0, 0)                          # cmpa.l #str_banner_path, a0
+    opt_asm.fixups.append((len(opt_asm.buf) - 4, 'str_banner_path', 'abs32'))
+    opt_asm.b_s(0x66, 'oa_plain')
+    opt_asm.label('oa_theme')
+    opt_asm.emit(0x2f08)                                # move.l a0, -(a7)
+    opt_asm.emit(0x2f00)                                # move.l d0, -(a7)
+    opt_asm.emit(0x42a7)                                # clr.l -(a7)
+    opt_asm.pea_label('str_temas_path')
+    opt_asm.emit(0x4eb9, 0x00ff, 0x2f48)                # jsr $ff2f48.l (fatOpenFileByName)
+    opt_asm.emit(0x508f)                                # addq.l #8, a7
+    opt_asm.emit(0x4a00)                                # tst.b d0
+    opt_asm.b_s(0x66, 'oa_loose')
+    opt_asm.emit(0x2079, 0x00ff, 0xc47a)                # movea.l $ffc47a.l, a0 (settings)
+    opt_asm.emit(0x7000)                                # moveq #0, d0
+    opt_asm.emit(0x1028, 0x000d)                        # move.b $d(a0), d0 (theme)
+    opt_asm.emit(0xed88)                                # lsl.l #6, d0
+    opt_asm.emit(0xd097)                                # add.l (a7), d0
+    opt_asm.emit(0x5280)                                # addq.l #1, d0 (after the name sector)
+    opt_asm.emit(0x2f00)                                # move.l d0, -(a7)
+    opt_asm.emit(0x4eb9, 0x00ff, 0x21d8)                # jsr $ff21d8.l (fatSkipSectors)
+    opt_asm.emit(0x588f)                                # addq.l #4, a7
+    opt_asm.emit(0x4a00)                                # tst.b d0
+    opt_asm.b_s(0x66, 'oa_loose')                       # (a theme beyond the end: its own file)
+    opt_asm.emit(0x508f)                                # addq.l #8, a7
+    opt_asm.emit(0x4e75)                                # rts
+    opt_asm.label('oa_loose')
+    opt_asm.emit(0x588f)                                # addq.l #4, a7
+    opt_asm.emit(0x205f)                                # movea.l (a7)+, a0
+    opt_asm.label('oa_plain')
+    opt_asm.emit(0x42a7)                                # clr.l -(a7)
+    opt_asm.emit(0x2f08)                                # move.l a0, -(a7)
+    opt_asm.emit(0x4eb9, 0x00ff, 0x2f48)                # jsr $ff2f48.l (fatOpenFileByName)
+    opt_asm.emit(0x508f)                                # addq.l #8, a7
+    opt_asm.emit(0x4e75)                                # rts
+
+    # dirStub (jmp from 0xFF1C8C, the browser reads a folder): on the first folder read of a boot
+    # (the card is up) the English text page goes over the Portuguese strings when the language
+    # is English (overlay page 6). reparo/build_repair.py puts its own call here.
+    opt_asm.label('dirStub')
+    opt_asm.emit(0x4a39, 0x00ff, 0xc5ad)                # tst.b $ffc5ad.l
+    opt_asm.b_s(0x66, 'ds_go')
+    opt_asm.emit(0x50f9, 0x00ff, 0xc5ad)                # st $ffc5ad.l
+    opt_asm.label('dirStubCall')
+    opt_asm.emit(0x2079, 0x00ff, 0xc47a)                # movea.l $ffc47a.l, a0 (settings)
+    opt_asm.emit(0x4a28, 0x000c)                        # tst.b $c(a0) (language)
+    opt_asm.b_s(0x67, 'ds_go')
+    opt_asm.emit(0x303c, 0x0500)                        # move.w #$0500, d0 (page 6, entry 0)
+    opt_asm.jsr_label('ovlEnter')
+    opt_asm.label('ds_go')
+    opt_asm.jmp_label('dirOpenHook')
+    opt_code_end = len(opt_asm.buf)
+
+    opt_asm.label('str_temas_path')
+    opt_asm.emit_str(b'/EDMD/TEMAS.BIN')
 
     # =========================================================================
     # blkA / blkB: old English strings that every reference was moved away from
@@ -1971,10 +2052,29 @@ def build_custom_mdos():
     ovl.emit(0x4cdf, 0x1c1c)                        # movem.l (a7)+, d2-d4/a2-a4
     ovl.emit(0x4e75)                                # rts
 
+    # Options. Settings word $c: byte $c = language (0 Portuguese, 1 English: the English pages load
+    # on the next boot), byte $d = theme: a theme of /EDMD/TEMAS.BIN (names read into $ffd600 here;
+    # the new banner and wallpaper load when the menu closes) or, without that file, one of the
+    # four built-in colour sets. d3 = 1: the theme changed.
     ovl.label('ovl_options')
     ovl.emit(0x48e7, 0x3830)                    # movem.l d2-d4/a2-a3, -(a7)
     ovl.emit(0x4244)                            # clr.w d4
-    ovl.emit(0x760f)                            # moveq #15, d3
+    ovl.emit(0x7600)                            # moveq #0, d3
+    ovl.emit(0x42b9, 0x00ff, 0xd600)            # clr.l $ffd600.l (no theme names yet)
+    ovl.emit(0x42a7)                            # clr.l -(a7)
+    ovl.pea_label('str_temas_path')
+    ovl.emit(0x4eb9, 0x00ff, 0x2f48)            # jsr $ff2f48.l (fatOpenFileByName)
+    ovl.emit(0x508f)                            # addq.l #8, a7
+    ovl.emit(0x4a00)                            # tst.b d0
+    ovl.bne_w('opt_refresh')
+    ovl.emit(0x4878, 0x0001)                    # pea.l $1.w
+    ovl.emit(0x4878, 0x0001)                    # pea.l $1.w (1 sector)
+    ovl.emit(0x4879, 0x00ff, 0xd600)            # pea.l $ffd600.l
+    ovl.emit(0x4eb9, 0x00ff, 0x23c6)            # jsr $ff23c6.l (fatRead)
+    ovl.emit(0x4fef, 0x000c)                    # lea.l $c(a7), a7
+    ovl.emit(0x4a00)                            # tst.b d0
+    ovl.beq_w('opt_refresh')
+    ovl.emit(0x42b9, 0x00ff, 0xd600)            # clr.l $ffd600.l
 
     ovl.label('opt_refresh')
     ovl.emit(0x2479, 0x00ff, 0xc47a)            # movea.l $ffc47a.l, a2
@@ -2031,17 +2131,38 @@ def build_custom_mdos():
     # Option 4: Visual Theme (push dst first, src second!)
     ovl.lea_label(0, 'str_opt_theme')
     ovl.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
-    ovl.emit(0x302a, 0x000c)                    # move.w $c(a2), d0
+    ovl.bsr_w('opt_themes')                     # d1 = themes in TEMAS.BIN, d0 = theme
+    ovl.emit(0x4a41)                            # tst.w d1
+    ovl.b_s(0x67, 'opt_th_own')
+    ovl.emit(0xe948)                            # lsl.w #4, d0
+    ovl.emit(0x41f9, 0x00ff, 0xd610)            # lea.l $ffd610.l, a0 (names)
+    ovl.emit(0x4870, 0x0000)                    # pea.l (a0, d0.w) (src)
+    ovl.b_s(0x60, 'opt_th_copy')
+    ovl.label('opt_th_own')
     ovl.emit(0x0240, 0x0003)                    # andi.w #3, d0
     ovl.emit(0xe540)                            # lsl.w #2, d0
     ovl.lea_label(0, 'theme_names_ptrs')
     ovl.emit(0x2f30, 0x0000)                    # move.l (a0, d0.w), -(a7) (src)
+    ovl.label('opt_th_copy')
+    ovl.emit(0x4e93)                            # jsr (a3) (edStrCopy)
+    ovl.emit(0x508f)                            # addq.l #8, a7
+
+    # Option 5: language
+    ovl.lea_label(0, 'str_opt_lang')
+    ovl.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
+    ovl.emit(0x4a2a, 0x000c)                    # tst.b $c(a2)
+    ovl.b_s(0x66, 'opt_lg_en')
+    ovl.pea_label('str_lang_pt')
+    ovl.b_s(0x60, 'opt_lg_copy')
+    ovl.label('opt_lg_en')
+    ovl.pea_label('str_lang_en')
+    ovl.label('opt_lg_copy')
     ovl.emit(0x4e93)                            # jsr (a3) (edStrCopy)
     ovl.emit(0x508f)                            # addq.l #8, a7
 
     ovl.emit(0x3f04)                            # move.w d4, -(a7)
     ovl.emit(0x4267)                            # clr.w -(a7)
-    ovl.emit(0x4878, 0x0005)                    # pea.l $5.w
+    ovl.emit(0x4878, 0x0006)                    # pea.l $6.w
     ovl.pea_label('menu_options_5')
     ovl.emit(0x4eb9, 0x00ff, 0x4834)            # jsr $ff4834.l (menuDraw)
     ovl.emit(0x3800)                            # move.w d0, d4
@@ -2059,12 +2180,33 @@ def build_custom_mdos():
 
     ovl.label('opt_tog_chk4')
     ovl.emit(0x0c40, 0x0004)                    # cmpi.w #4, d0 (4 = Theme)
-    ovl.bne_w('opt_tog_bool')
-    ovl.emit(0x302a, 0x000c)                    # move.w $c(a2), d0
+    ovl.bne_w('opt_tog_chk5')
+    ovl.bsr_w('opt_themes')
     ovl.emit(0x5240)                            # addq.w #1, d0
+    ovl.emit(0x4a41)                            # tst.w d1
+    ovl.b_s(0x67, 'opt_tt_own')
+    ovl.emit(0xb041)                            # cmp.w d1, d0
+    ovl.b_s(0x65, 'opt_tt_set')                 # bcs.s
+    ovl.emit(0x7000)                            # moveq #0, d0
+    ovl.label('opt_tt_set')
+    ovl.emit(0x1540, 0x000d)                    # move.b d0, $d(a2)
+    ovl.emit(0x7601)                            # moveq #1, d3 (load it when the menu closes)
+    ovl.bra_w('opt_refresh')
+    ovl.label('opt_tt_own')
     ovl.emit(0x0240, 0x0003)                    # andi.w #3, d0
-    ovl.emit(0x3540, 0x000c)                    # move.w d0, $c(a2)
+    ovl.emit(0x1540, 0x000d)                    # move.b d0, $d(a2)
     ovl.jsr_label('applyTheme')
+    ovl.bra_w('opt_refresh')
+
+    ovl.label('opt_tog_chk5')
+    ovl.emit(0x0c40, 0x0005)                    # cmpi.w #5, d0 (5 = language)
+    ovl.bne_w('opt_tog_bool')
+    ovl.emit(0x0a2a, 0x0001, 0x000c)            # eori.b #1, $c(a2)
+    ovl.emit(0x42a7)                            # clr.l -(a7)
+    ovl.emit(0x4878, 0x0001)                    # pea.l $1.w
+    ovl.pea_label('menu_restart')               # "restart the console"
+    ovl.emit(0x4eb9, 0x00ff, 0x4834)            # jsr $ff4834.l (menuDraw)
+    ovl.emit(0x4fef, 0x000c)                    # lea.l $c(a7), a7
     ovl.bra_w('opt_refresh')
 
     ovl.label('opt_tog_bool')
@@ -2077,7 +2219,29 @@ def build_custom_mdos():
     ovl.bra_w('opt_refresh')
 
     ovl.label('opt_exit')
+    ovl.emit(0x4a03)                            # tst.b d3 (new theme?)
+    ovl.b_s(0x67, 'opt_ret')
+    ovl.emit(0x4279, 0x00ff, 0xc5a4)            # clr.w $ffc5a4.l: banner + wallpaper load again
+    ovl.label('opt_ret')                        #   on the next screen (the overlay is gone then)
     ovl.emit(0x4cdf, 0x0c1c)                    # movem.l (a7)+, d2-d4/a2-a3
+    ovl.emit(0x4e75)                            # rts
+
+    # opt_themes -> d1.w = themes in TEMAS.BIN (0: no file), d0.w = the chosen theme (0 when it
+    # is past the end of the file)
+    ovl.label('opt_themes')
+    ovl.emit(0x7200)                            # moveq #0, d1
+    ovl.emit(0x0cb9, 0x544d, 0x4153, 0x00ff, 0xd600)  # cmpi.l #'TMAS', $ffd600.l
+    ovl.b_s(0x66, 'opt_th_n')
+    ovl.emit(0x3239, 0x00ff, 0xd604)            # move.w $ffd604.l, d1
+    ovl.label('opt_th_n')
+    ovl.emit(0x7000)                            # moveq #0, d0
+    ovl.emit(0x102a, 0x000d)                    # move.b $d(a2), d0
+    ovl.emit(0x4a41)                            # tst.w d1
+    ovl.b_s(0x67, 'opt_th_ret')
+    ovl.emit(0xb041)                            # cmp.w d1, d0
+    ovl.b_s(0x65, 'opt_th_ret')                 # bcs.s
+    ovl.emit(0x7000)                            # moveq #0, d0
+    ovl.label('opt_th_ret')
     ovl.emit(0x4e75)                            # rts
 
 
@@ -2108,6 +2272,19 @@ def build_custom_mdos():
     ovl.emit(0x4e75)                                # rts
 
     ovl_code_end = len(ovl.buf)
+
+    ovl.label('menu_restart')                       # menuDraw: title + one line (pointers)
+    ovl.emit_l(0, 0)
+    ovl.fixups.append((len(ovl.buf) - 8, 'str_restart_title', 'abs32'))
+    ovl.fixups.append((len(ovl.buf) - 4, 'str_restart', 'abs32'))
+    ovl.label('str_restart_title')
+    ovl.emit_str(b'Idioma / Language')
+    ovl.label('str_restart')
+    ovl.emit_str(b'Reinicie o console / Restart the console')
+    ovl.label('str_lang_pt')
+    ovl.emit_str(b'PT-BR')
+    ovl.label('str_lang_en')
+    ovl.emit_str(b'ENGLISH')
 
     # ---- overlay data
     ovl.label('about_table')
@@ -2158,11 +2335,11 @@ def build_custom_mdos():
 
     # ROM Info Screen labels
     ovl.label('str_ri_title')
-    ovl.emit_str(b'Info da ROM (Cabe\x80alho SEGA)')
+    ovl.emit_str(b'Info da ROM (Cabe\x80alho SEGA)', b'ROM Info (SEGA header)')
     ovl.label('str_ri_us')
-    ovl.emit_str(b'Nome US/EU:')
+    ovl.emit_str(b'Nome US/EU:', b'US/EU name:')
     ovl.label('str_ri_jp')
-    ovl.emit_str(b'Nome JP:')
+    ovl.emit_str(b'Nome JP:', b'JP name:')
     ovl.label('str_ri_sys')
     ovl.emit_str(b'Console:')
     ovl.label('str_ri_cop')
@@ -2170,39 +2347,39 @@ def build_custom_mdos():
     ovl.label('str_ri_ser')
     ovl.emit_str(b'Serial:')
     ovl.label('str_ri_reg')
-    ovl.emit_str(b'Regi\x81o:')
+    ovl.emit_str(b'Regi\x81o:', b'Region:')
     ovl.label('str_ri_chk')
     ovl.emit_str(b'Checksum:')
     ovl.label('str_ri_art')
-    ovl.emit_str(b'Arq. Capa:')
+    ovl.emit_str(b'Arq. Capa:', b'Box art:')
 
     # About / Credits Screen
     ovl.label('str_ab_title')
     ovl.emit_str(b'EverDrive-MD V3 Flashcart')
     ovl.label('str_ab_dev')
-    ovl.emit_str(b'Desenvolvido por I. Golubovskiy')
+    ovl.emit_str(b'Desenvolvido por I. Golubovskiy', b'Developed by I. Golubovskiy')
     ovl.label('str_ab_mod_hdr')
-    ovl.emit_str(b'Mod PT-BR, Artwork & Favoritos:')
+    ovl.emit_str(b'Mod PT-BR, Artwork & Favoritos:', b'PT-BR mod, artwork & favorites:')
     ovl.label('str_ab_mod_2')
-    ovl.emit_str(b'por Antonio e the Nobre')
+    ovl.emit_str(b'por Antonio e the Nobre', b'by Antonio and the Nobre')
     ovl.label('str_ab_sup_hdr')
-    ovl.emit_str(b'Suporte:')
+    ovl.emit_str(b'Suporte:', b'Support:')
     ovl.label('str_ab_sup_1')
     ovl.emit_str(b'biokrik@gmail.com')
     ovl.label('str_ab_sup_2')
     ovl.emit_str(b'http://krikzz.com')
     ovl.label('str_ab_ctl_hdr')
-    ovl.emit_str(b'Controles:')
+    ovl.emit_str(b'Controles:', b'Controls:')
     ovl.label('str_ab_ctl_1')
-    ovl.emit_str(b'ESQ/DIR - mudar p\x83gina')
+    ovl.emit_str(b'ESQ/DIR - mudar p\x83gina', b'LEFT/RIGHT - change page')
     ovl.label('str_ab_ctl_2')
-    ovl.emit_str(b'START - repetir \x85ltimo jogo')
+    ovl.emit_str(b'START - repetir \x85ltimo jogo', b'START - replay last game')
     ovl.label('str_ab_ctl_3')
-    ovl.emit_str(b'A - menu do arquivo + Boxart')
+    ovl.emit_str(b'A - menu do arquivo + Boxart', b'A - file menu + box art')
     ovl.label('str_ab_ctl_4')
-    ovl.emit_str(b'B - voltar')
+    ovl.emit_str(b'B - voltar', b'B - back')
     ovl.label('str_ab_ctl_5')
-    ovl.emit_str(b'C - menu principal')
+    ovl.emit_str(b'C - menu principal', b'C - main menu')
 
 
 
@@ -2246,6 +2423,49 @@ def build_custom_mdos():
     search = build_search(all_labels['clsBanner'])
     assert rom[0x8E00:0x8E00 + 7 * 512] == bytes(7 * 512)
     rom[0x8E00:0x8E00 + len(search)] = search
+
+    # English: overlay pages 4 and 5 are pages 1 and 2 in English (ovlEnter picks them when the
+    # settings say English), page 6 writes the English text over the Portuguese strings of the
+    # resident code (dirStub runs it on the first folder read of each boot). Page 3 (0x9C00) is
+    # left free for reparo/build_repair.py.
+    PAGE = lambda n: 0x8000 + (n - 1) * 7 * 512
+    for n in (3, 4, 5, 6):
+        assert rom[PAGE(n):PAGE(n) + 7 * 512] == bytes(7 * 512), n
+    ovl_en = bytearray(ovl.buf)
+    for addr, en in ovl.en:
+        off = addr - 0xFFC800
+        ovl_en[off:off + len(en) + 1] = en + b'\0'
+    rom[PAGE(4):PAGE(4) + len(ovl_en)] = ovl_en
+    search_en = build_search(all_labels['clsBanner'], en=True)
+    rom[PAGE(5):PAGE(5) + len(search_en)] = search_en
+    en_page = Asm68k(0xFFC800)                      # entry 0: copy each (address, count, bytes)
+    en_page.lea_pc(0, 'en_tab')                     # lea en_tab(pc), a0
+    en_page.label('en_next')
+    en_page.emit(0x2018)                            # move.l (a0)+, d0
+    en_page.b_s(0x67, 'en_done')
+    en_page.emit(0x2240)                            # movea.l d0, a1
+    en_page.emit(0x3218)                            # move.w (a0)+, d1
+    en_page.emit(0x5341)                            # subq.w #1, d1
+    en_page.label('en_copy')
+    en_page.emit(0x12d8)                            # move.b (a0)+, (a1)+
+    en_page.dbra(1, 'en_copy')
+    en_page.emit(0x2008)                            # move.l a0, d0
+    en_page.emit(0x0800, 0x0000)                    # btst #0, d0 (entries are word aligned)
+    en_page.b_s(0x67, 'en_next')
+    en_page.emit(0x5288)                            # addq.l #1, a0
+    en_page.b_s(0x60, 'en_next')
+    en_page.label('en_done')
+    en_page.emit(0x4e75)                            # rts
+    en_page.label('en_tab')
+    for b in (blk1, blk2, blk3, ext, opt_asm, blkA, blkB):
+        for addr, en in b.en:
+            en_page.emit_l(addr)
+            en_page.emit(len(en) + 1)
+            en_page.emit_b(en + b'\0')
+    en_page.emit_l(0)
+    en_page.resolve()
+    assert len(en_page.buf) <= 7 * 512, f'English page too large: {len(en_page.buf)}'
+    rom[PAGE(6):PAGE(6) + len(en_page.buf)] = en_page.buf
 
     assert 0x6E48 + len(ext.buf) <= 0x8000, f"Extension exceeds 32KB limit: 0x{0x6E48 + len(ext.buf):04X}"
     rom[0x6E48:0x6E48 + len(ext.buf)] = ext.buf
@@ -2315,7 +2535,7 @@ def build_custom_mdos():
 
     # B8. folder (re)read: drop the letter filter tag (ff1c8c: move.l d2,-(a7); move.l 8(a7),-(a7))
     assert rom[0x1C8C:0x1C92] == bytes.fromhex('2f022f2f0008')
-    struct.pack_into('>HI', rom, 0x1C8C, 0x4EF9, all_labels['dirOpenHook'])
+    struct.pack_into('>HI', rom, 0x1C8C, 0x4EF9, all_labels['dirStub'])
 
     # B6. gDrawBox: highlight bar for the last item of the recents list
     assert rom[0x47EC:0x47F2] == bytes.fromhex('2ebc0000c000')
@@ -2425,7 +2645,7 @@ def build_custom_mdos():
         ('blk1_helpers', bytes(blk1.buf), 0xFF0B92),
         ('blk2_about', bytes(blk2.buf[:blk2_code_end]), 0xFF4F74),
         ('blk3_random', bytes(blk3.buf), 0xFF50BC),
-        ('optionsMenu_v2', bytes(opt_asm.buf), 0xFF49B6),
+        ('optionsMenu_v2', bytes(opt_asm.buf[:opt_code_end]), 0xFF49B6),
         ('ext_code', bytes(ext.buf[:code_end_off]), 0xFF6E48),
         ('blkA', bytes(blkA.buf), 0xFF6854),
         ('blkB', bytes(blkB.buf), 0xFF6B08),
@@ -2447,7 +2667,7 @@ def build_custom_mdos():
     for blk_name, blk_buf, blk_base in [('ext', bytes(ext.buf[:code_end_off]), 0xFF6E48),
                                         ('overlay', bytes(ovl.buf[:ovl_code_end]), 0xFFC800),
                                         ('blk1', bytes(blk1.buf), 0xFF0B92), ('blk2', bytes(blk2.buf), 0xFF4F74),
-                                        ('blk3', bytes(blk3.buf), 0xFF50BC), ('opt', bytes(opt_asm.buf), 0xFF49B6),
+                                        ('blk3', bytes(blk3.buf), 0xFF50BC), ('opt', bytes(opt_asm.buf[:opt_code_end]), 0xFF49B6),
                                         ('blkA', bytes(blkA.buf), 0xFF6854), ('blkB', bytes(blkB.buf), 0xFF6B08)]:
         for insn in md.disasm(blk_buf, blk_base):
             op = int.from_bytes(insn.bytes[:2], 'big')
@@ -2469,6 +2689,7 @@ def build_custom_mdos():
     print(f"  opt  (0xFF49B6):  {len(opt_asm.buf)} / 414 bytes")
     print(f"  blkA (0xFF6854):  {len(blkA.buf)} / 124 bytes   blkB (0xFF6B08):  {len(blkB.buf)} / 222 bytes")
     print(f"  ovl  (file 0x8000 -> 0xFFC800): {len(ovl.buf)} / 3584 bytes, search (file 0x8E00): {len(search)} / 3584 bytes")
+    print(f"  English: page 6 (text) {len(en_page.buf)} / 3584 bytes, search {len(search_en)} / 3584 bytes")
     print(f"  ext  (0xFF6E48):  0xFF6E48..0xFF{0x6E48 + used - 1:04X} ({used} bytes used, {free} bytes free)")
     print(f"  SHA-256: {sha}")
     print("  100% verified: 0 clone-check instructions, all m68k code blocks disassembled cleanly!")

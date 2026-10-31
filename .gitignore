@@ -25,6 +25,7 @@
 !/sync_roms_art.py
 !/make_banner.py
 !/make_wallpaper.py
+!/make_temas.py
 
 # arte própria (banner e wallpaper), livre para compartilhar
 !/arte/

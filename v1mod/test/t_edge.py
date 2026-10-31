@@ -3,9 +3,9 @@ import emu
 from t_all_lib import *
 low = [0x1000000]
 def track(m):
-    ram = bytes(m.mu.mem_read(0xFFEE00, 0x10000 - 0xEE00 - 0x10))
+    ram = bytes(m.mu.mem_read(0xFFEF00, 0x10000 - 0xEF00 - 0x10))
     i = next((k for k, b in enumerate(ram) if b != 0xA5), len(ram))
-    low[0] = min(low[0], 0xFFEE00 + i)
+    low[0] = min(low[0], 0xFFEF00 + i)
 
 # phase A again to get lists (favourite Columns, recent Blockout)
 m = new()

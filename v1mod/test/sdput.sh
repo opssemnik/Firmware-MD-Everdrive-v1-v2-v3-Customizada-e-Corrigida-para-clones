@@ -21,3 +21,6 @@ cp sd.img sdo.img && mcopy -o -i sdo.img /tmp/old.bin ::/EDMD/V1EXT.BIN
 cp sd.img sdm.img
 mcopy -o -i sdm.img "$R/temas/maddrugamers/EDMD/BANNER.ART" ::/EDMD/BANNER.ART
 mcopy -o -i sdm.img "$R/temas/maddrugamers/EDMD/WALL.ART" ::/EDMD/WALL.ART
+# sdt.img = sd.img + /EDMD/TEMAS.BIN (make_temas.py: every theme in one file)
+cp sd.img sdt.img
+mcopy -o -i sdt.img "$R/sd/EDMD/TEMAS.BIN" ::/EDMD/TEMAS.BIN

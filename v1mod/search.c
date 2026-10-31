@@ -18,7 +18,7 @@ static const u8 kbBtnX[3] = {0, 4, 7};
 
 static void kbDraw(const char *q, int n, int cx, int cy)
 {
-    static const char *const btn[3] = {SX_space, SX_del, SX_ok};
+    const char *const btn[3] = {SX_space, SX_del, SX_ok};
     char b[KB_LEN + 4];
     int i, x, y;
 
@@ -236,7 +236,7 @@ static void srRedraw(void)
  * folder the search started in). */
 u32 browserSearch(void)
 {
-    static const char *const modes[] = {SX_by_name, S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num};
+    const char *const modes[] = {SX_by_name, S_flt_af, S_flt_gl, S_flt_mr, S_flt_sz, S_flt_num};
     static char letters[8][2];
     const char *items[8];
     char q[KB_LEN + 1], letter = 0;

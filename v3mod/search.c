@@ -67,6 +67,20 @@ typedef struct {
 #define BTN_START 0x80
 
 /* font: 0x80 ç, 0x81 ã, 0x82 õ, 0x83 á, 0x84 é, 0x85 ú, 0x86 ó, 0x87 Ã */
+#ifdef LANG_EN     /* the English page (overlay page 5), loaded instead of page 2 */
+static const char S_title[] = "Search All Folders";
+static const char S_by_name[] = "By Name (type it)";
+static const char S_af[] = "A - F", S_gl[] = "G - L", S_mr[] = "M - R", S_sz[] = "S - Z", S_num[] = "0 - 9 and Others";
+static const char S_kb_title[] = "Search by Name";
+static const char S_kb_help[] = "A: type    B: delete  START: search";
+static const char S_space[] = "Space", S_del[] = "Delete", S_ok[] = "Search";
+static const char S_searching[] = "Searching All Folders...";
+static const char S_stop[] = "B: stop";
+static const char S_folders[] = "Folders read: ";
+static const char S_found[] = "Found:        ";
+static const char S_none[] = "No Games Found";
+static const char S_full[] = "Too Many Results: only the first 512";
+#else
 static const char S_title[] = "Buscar em Todas as Pastas";
 static const char S_by_name[] = "Por Nome (digitar)";
 static const char S_af[] = "A - F", S_gl[] = "G - L", S_mr[] = "M - R", S_sz[] = "S - Z", S_num[] = "0 - 9 e Outros";
@@ -79,6 +93,7 @@ static const char S_folders[] = "Pastas lidas: ";
 static const char S_found[] = "Encontrados:  ";
 static const char S_none[] = "Nenhum Jogo Encontrado";
 static const char S_full[] = "Muitos Resultados: s\x86 os 512 Primeiros";
+#endif
 static const char kbKeys[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'&";
 static const u8 kbBtnX[3] = {0, 4, 7};
 #define KB_LEN 20

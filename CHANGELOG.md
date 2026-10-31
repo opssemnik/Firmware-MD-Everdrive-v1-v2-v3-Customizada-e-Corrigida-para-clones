@@ -1,10 +1,17 @@
 # Mudanças
 
 ## Capas
-- `sd/EDMD/BANNER.ART` e `sd/EDMD/WALL.ART`: banner e wallpaper retrô próprios (desde a 1.14).
+- `sd/EDMD/TEMAS.BIN` (desde a 1.27): os 7 temas num arquivo só (`make_temas.py`, arte de `arte/gen_temas.py`).
+- `sd/EDMD/BANNER.ART` e `sd/EDMD/WALL.ART`: banner e wallpaper retrô próprios (desde a 1.14), usados sem o `TEMAS.BIN`.
 - 2176 capas `.ART` prontas em `sd/EDMD/ART` (geradas com `sync_roms_art.py` a partir da libretro-thumbnails).
 
 ## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
+
+### 1.27 — 2026-10-31
+- **Temas num arquivo só:** `EDMD/TEMAS.BIN` traz 7 temas completos (banner, wallpaper e cores): PADRÃO, RG POA, SEGA 16, OUTRUN, SYNTHWAVE, MADDRUGA e o novo **RETROCHIMP** (grupo Retrochimp Games). O item **Tema** do menu principal troca de tema na hora; a arte de PADRÃO, RG POA, SEGA 16, OUTRUN e RETROCHIMP é nova.
+- **Idioma / Language:** novo item **Idioma** no menu principal: português ou inglês (English), troca na hora e fica salvo no cartucho.
+- Sem o `TEMAS.BIN` tudo continua como antes (`BANNER.ART` / `WALL.ART` avulsos e os 4 conjuntos de cores).
+- Só o `V1EXT.BIN` mudou: quem já está na 1.22 ou mais nova troca o `EDMD/V1EXT.BIN` e copia o `EDMD/TEMAS.BIN`.
 
 ### 1.26 — 2026-10-30
 - Sem mudanças além da versão (mesma numeração da v3). Quem já está na 1.22 ou mais nova só troca o `EDMD/V1EXT.BIN`.
@@ -143,6 +150,11 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.27 — 2026-10-31
+- **Temas num arquivo só:** **Opções → Tema Visual** lista os 7 temas do `EDMD/TEMAS.BIN` (banner, wallpaper e cores); o tema novo aparece ao voltar para a lista de jogos.
+- **Idioma / Language:** **Opções → Idioma**: português ou inglês (English); vale ao ligar o console de novo.
+- O `Tema-Maddrugamers.zip` saiu da release: o tema está dentro do `TEMAS.BIN`.
 
 ### 1.26 — 2026-10-30
 - Novo **Unbrick - Recuperar** (`Unbrick-Recuperar-EverDrive-v3.zip`, à parte): o OS PT-BR com o reparo do setor de boot para cartuchos v3 travados pela proteção do OS original ("EverDrive clone detected ... Device locked permanently"). Na lista de jogos ele confere o boot; se estiver diferente, **A** regrava e confere os 64 KB. Depois é só voltar para o `MDOS.BIN` normal.

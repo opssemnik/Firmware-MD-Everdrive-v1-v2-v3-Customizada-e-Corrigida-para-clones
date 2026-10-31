@@ -26,7 +26,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.26'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.27'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     # /EDMD/V1EXT.BIN on the SD card
@@ -61,6 +61,11 @@ C_STRINGS = {
     'S_thm3': 'OUTRUN',
     'S_thm_banner': 'DO BANNER',
     'S_thm_locked': 'As cores vêm do BANNER.ART',
+    'S_thm_loading': 'Carregando o tema...',
+    'S_mm_lang': 'Idioma: ',
+    'S_lang_pt': 'PT-BR',
+    'S_lang_en': 'ENGLISH',
+    'S_temas_path': '/EDMD/TEMAS.BIN',
     'S_fm_load_start': 'Carregar e jogar',
     'S_fm_load_only': 'Só carregar',
     'S_fm_cheats': 'Jogar com cheats',
@@ -134,6 +139,36 @@ C_STRINGS.update({
     'SX_found': 'Encontrados:  ',
     'SX_full': 'Muitos resultados: só os 512 primeiros',
 })
+
+# English (menu "Idioma" / "Language"): the strings above get an English twin; the stock strings
+# below simply stay as they are (their patches are undone)
+C_STRINGS_EN = {
+    'S_mm_play': 'Play last game', 'S_mm_select': 'Select game', 'S_mm_recent': 'Recent games',
+    'S_mm_fav': 'Favorites', 'S_mm_random': 'Random game', 'S_mm_options': 'Options',
+    'S_mm_tools': 'Tools', 'S_mm_theme': 'Theme: ', 'S_thm0': 'DEFAULT', 'S_thm_banner': 'BANNER',
+    'S_thm_locked': 'The colours come from BANNER.ART', 'S_thm_loading': 'Loading the theme...',
+    'S_mm_lang': 'Language: ',
+    'S_fm_load_start': 'Load and play', 'S_fm_load_only': 'Load only', 'S_fm_cheats': 'Play with cheats',
+    'S_help': 'A: menu   START: play     C: search',
+    'S_flt_num': '0 - 9 and others', 'S_fm_add_fav': 'Add to favorites', 'S_fm_rom_info': 'ROM info',
+    'S_back': 'Back', 'S_fv_play': 'Play', 'S_fv_remove': 'Remove from favorites',
+    'S_recent_title': 'Recent games', 'S_fav_title': 'Favorites', 'S_no_recent': 'No recent games',
+    'S_clear_recent': '[ CLEAR RECENTS ]', 'S_no_fav': 'No favorites saved', 'S_fav_saved': 'Saved to favorites!',
+    'S_fav_removed': 'Removed from favorites', 'S_loaded_ok': 'Game loaded into memory',
+    'S_not_found': 'File not found on the SD card', 'S_too_small': 'File too small',
+    'S_no_games': 'No games found', 'S_rand_search': 'Picking a game...', 'S_saving': 'Saving...',
+    'S_sel_error': 'select error: ', 'S_prog_error': 'program error: ', 'S_fat_error': 'FAT error: ',
+    'S_no_art': 'no box art', 'S_ri_title': 'ROM info (SEGA header)', 'S_ri_us': 'US/EU name:',
+    'S_ri_jp': 'JP name:', 'S_ri_reg': 'Region:', 'S_ri_size': 'Size (KB): ', 'S_ri_art': 'Box art:',
+    'S_ri_kanji': '(in Japanese)', 'S_ri_nohdr': 'SEGA header not found', 'S_press_key': 'Press a button',
+    'S_ab_dev': 'developed by Igor Golubovskiy', 'S_ab_mod1': 'PT-BR mod, box art, recents and favorites:',
+    'S_ab_mod2': 'by Antonio and the Nobre', 'S_ab_sup': 'support:', 'S_ab_date': 'assembly date:',
+    'S_ab_dist': 'distributed by:',
+    'SX_title': 'Search all folders', 'SX_by_name': 'By name (type it)', 'SX_kb_title': 'Search by name',
+    'SX_kb_help': 'A: type    B: delete  START: search', 'SX_space': 'SPACE', 'SX_del': 'DELETE',
+    'SX_ok': 'SEARCH', 'SX_searching': 'Searching all folders...', 'SX_stop': 'B: stop',
+    'SX_folders': 'Folders read: ', 'SX_found': 'Found:        ', 'SX_full': 'Too many results: only the first 512',
+}
 
 # ---------------------------------------------------------------- stock strings moved to flash
 OS_REPOINT = {
@@ -312,6 +347,7 @@ def c_bytes(b):
 
 def gen_sources(glyphs, banner):
     """gen.h / gen.c: glyph + banner data and all strings (all in the extension)."""
+    assert not set(C_STRINGS_EN) - set(C_STRINGS), set(C_STRINGS_EN) - set(C_STRINGS)
     strings = {name: enc(t) + b'\0' for name, t in C_STRINGS.items()}
     strings['S_banner'] = bytes(range(BANNER_BASE, BANNER_BASE + len(banner) // 16)) + b'\0'
     for addr, t in OS_REPOINT.items():
@@ -319,11 +355,21 @@ def gen_sources(glyphs, banner):
     h = ['#ifndef GEN_H', '#define GEN_H', f'#define NGLYPH {len(glyphs)}',
          f'#define GLYPH_TILE 0x{GLYPH_BASE + 0x4E0:x}', f'#define BANNER_TILE 0x{BANNER_BASE + 0x4E0:x}',
          f'#define NBANNER {len(banner) // 16}',
-         'extern const unsigned char glyph1bpp[];', 'extern const unsigned char banner2bpp[];']
+         'extern const unsigned char glyph1bpp[];', 'extern const unsigned char banner2bpp[];',
+         'extern const unsigned char v3acc[8];       /* TEMAS.BIN names: v3 font codes 0x80.. -> ours */',
+         'extern unsigned char gLang;                /* 1 = English */']
     c = ['#include "gen.h"',
          f'const unsigned char glyph1bpp[] = {{{c_bytes(sum(glyphs, []))}}};',
-         f'const unsigned char banner2bpp[] = {{{c_bytes(banner)}}};']
+         f'const unsigned char banner2bpp[] = {{{c_bytes(banner)}}};',
+         f'const unsigned char v3acc[8] = {{{c_bytes(enc("çãõáéúóÃ"))}}};']
     for name, data in strings.items():
+        if name in C_STRINGS_EN:
+            en = C_STRINGS_EN[name].encode('ascii') + b'\0'
+            h.append(f'extern const char {name}_pt[], {name}_en[];')
+            h.append(f'#define {name} (gLang ? {name}_en : {name}_pt)')
+            c.append(f'const char {name}_pt[] = {{{c_bytes(data)}}};')
+            c.append(f'const char {name}_en[] = {{{c_bytes(en)}}};')
+            continue
         h.append(f'extern const char {name}[];')
         c.append(f'const char {name}[] = {{{c_bytes(data)}}};')
     h.append('#endif')
@@ -406,11 +452,11 @@ def main():
     img = bytearray(rom)
     patches = []
 
-    def patch(ram, old, new):
+    def patch(ram, old, new, lang=False):
         off = ram - RAM
         assert img[off:off + len(old)] == old, f'{ram:06X}: expected {old.hex()} got {img[off:off + len(old)].hex()}'
         if old[:len(new)] != new:
-            patches.append((ram, bytes(img[off:off + len(new)]), bytes(new)))
+            patches.append((ram, bytes(img[off:off + len(new)]), bytes(new), lang))
         img[off:off + len(new)] = new
 
     jsr = lambda t: struct.pack('>HI', 0x4EB9, t)
@@ -472,7 +518,7 @@ def main():
                 continue
             for k in range(2, i.size - 3, 2):
                 if struct.unpack_from('>I', i.bytes, k)[0] == addr:
-                    patch(i.address + k, struct.pack('>I', addr), struct.pack('>I', new))
+                    patch(i.address + k, struct.pack('>I', addr), struct.pack('>I', new), lang=True)
                     hits += 1
         assert hits, f'no reference to {addr:06X}'
         nrefs += hits
@@ -481,7 +527,7 @@ def main():
         old_len = stock.index(b'\0', off) - off
         b = enc(text)
         assert len(b) <= old_len, f'{text!r} longer than {old_len}'
-        patch(addr, stock[off:off + old_len], b + b'\0' * (old_len - len(b)))
+        patch(addr, stock[off:off + old_len], b + b'\0' * (old_len - len(b)), lang=True)
     assert img[slice(*CHECKSUMMED)] == stock[slice(*CHECKSUMMED)]   # stock checksum input unchanged
     assert img[0x40F8:0x40FE] == stock[0x40F8:0x40FE]
 
@@ -489,8 +535,9 @@ def main():
     ext = bytearray((BUILD / 'ext.bin').read_bytes())
     assert secs['.ext'][0] == EXT_ADDR and len(ext) <= EXT_SIZE
     tab = bytearray()
-    for ram, old, new in patches:
-        tab += struct.pack('>IH', ram, len(new)) + old + new
+    for ram, old, new, lang in patches:
+        assert len(new) < 0x8000
+        tab += struct.pack('>IH', ram, len(new) | (0x8000 if lang else 0)) + old + new
     tab += bytes(6)
     toff = syms['patchTab'] - EXT_ADDR
     assert len(tab) <= PATCH_MAX and not any(ext[toff:toff + PATCH_MAX]), f'patch table {len(tab)} > {PATCH_MAX}'

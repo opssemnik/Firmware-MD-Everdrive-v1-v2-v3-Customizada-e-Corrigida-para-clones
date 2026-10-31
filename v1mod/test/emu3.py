@@ -62,10 +62,11 @@ class MachineV3(emu.Machine):
             self.align(self.mu, 0, dst, 2, 0, None)
             return 0
         data = bytes(self.sd[lba * 512:(lba + cnt) * 512])
-        if mode == 1 or dst >= 0xFF0000:
-            self.mu.mem_write(dst & 0xFFFFFF, data)
-        else:                                            # into cart memory (game load)
-            self.mu.mem_write(dst & 0x7FFFFF, data)
+        addr = dst & 0xFFFFFF if mode == 1 or dst >= 0xFF0000 else dst & 0x7FFFFF   # else: game load
+        self.mu.mem_write(addr, data)
+        # code read over code that already ran (overlay pages at 0xFFC800): Unicorn keeps the old
+        # translated blocks unless told (the real 68000 has no such cache)
+        self.mu.ctl_remove_cache(addr, addr + len(data))
         return 0
 
     def disk_write(self):

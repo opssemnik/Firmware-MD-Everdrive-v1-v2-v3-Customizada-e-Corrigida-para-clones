@@ -31,7 +31,7 @@ class Machine:
         mu.mem_write(0x10000, osimg)
         mu.mem_write(0x30000, flash_init if flash_init else b'\xff' * 0x10000)
         mu.mem_write(0xFF0000, osimg)
-        mu.mem_write(0xFFEE00, bytes([0xA5]) * (0x10000 - 0xEE00 - 0x10))   # stack low-water pattern
+        mu.mem_write(0xFFEF00, bytes([0xA5]) * (0x10000 - 0xEF00 - 0x10))   # stack low-water pattern (above the mod bss)
         self.sd = bytearray(Path(sd_path).read_bytes())
         self.vram = bytearray(0x10000)
         self.cram = [0] * 64

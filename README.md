@@ -10,19 +10,19 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
 | EverDrive-MD **v1 / v2** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
-| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `3693414389d0f2065578085bcd1e760df9b3c58304df709c936a6fd4dca32ee8` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `d7582c13c448093495f05f7d6fcc7b4274143a7e7a2a4fb93e6057e3dfefd302` |
+| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `7d08cd6895a888452d68d6adf7ebd20ec66ddcb76e3f63ee8a1d298806eaf7c1` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `eab32239c1e0ce0301d12b953d98f26c3b634a0414465567045c93e7991944dc` |
 
 **Releases** ([página de Releases](../../releases)): os firmwares e os temas:
 
 | Arquivo | O que é |
 |---|---|
-| `SD-EverDrive-v1-v2.zip` | **v1 / v2**, para a raiz do cartão SD: `OS-V38-PTBR-<versão>.BIN` (o firmware, para gravar uma vez) e a pasta `EDMD` com `V1EXT.BIN` (a extensão, com todo o mod), capas, banner e wallpaper |
-| `SD-EverDrive-v1-v2-sem-capas.zip` | **v1 / v2**, só o firmware e a extensão (`OS-V38-PTBR-<versão>.BIN` + `EDMD/V1EXT.BIN`) |
+| `SD-EverDrive-v1-v2.zip` | **v1 / v2**, para a raiz do cartão SD: `OS-V38-PTBR-<versão>.BIN` (o firmware, para gravar uma vez) e a pasta `EDMD` com `V1EXT.BIN` (a extensão, com todo o mod), capas e os temas (`TEMAS.BIN`) |
+| `SD-EverDrive-v1-v2-sem-capas.zip` | **v1 / v2**, só o firmware, a extensão e os temas (`OS-V38-PTBR-<versão>.BIN` + `EDMD/V1EXT.BIN` + `EDMD/TEMAS.BIN`) |
 | `MDOS.BIN` | firmware da **v3**, já com o nome certo |
-| `SD-EverDrive-v3.zip` | **v3**, para a raiz do cartão SD: `EDMD/MDOS.BIN` (o firmware), capas, banner e wallpaper |
+| `SD-EverDrive-v3.zip` | **v3**, para a raiz do cartão SD: `EDMD/MDOS.BIN` (o firmware), capas e os temas (`TEMAS.BIN`) |
 | `Unbrick-Recuperar-EverDrive-v3.zip` | **v3 travado** pela proteção do OS original ("EverDrive clone detected"): o OS PT-BR com o reparo do boot - veja [Unbrick](#unbrick---recuperar-v3-travado) |
-| `Tema-Maddrugamers.zip` | tema do canal [Maddrugamers](https://www.youtube.com/@maddrugamers) (v1 / v2 e v3): `EDMD/BANNER.ART` + `EDMD/WALL.ART`, com as cores do tema dentro do banner - veja [Temas](#temas) |
+| `TEMAS.BIN` | os 7 temas num arquivo só (v1 / v2 e v3), para quem baixou só o firmware: vai em `/EDMD/TEMAS.BIN` - veja [Temas](#temas) |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
 > Igor Golubovskiy (krikzz.com). Use por sua conta e risco. **Nenhuma ROM está incluída.**
@@ -33,9 +33,11 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 
 As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 
-- **Tudo em português**, com acentos (á à â ã é ê í ó ô õ ú ç) desenhados no estilo da fonte original
-- **Banner "RETROGAMER POA"** no topo da lista de jogos e dos menus, e tela de créditos com o grupo;
-  pode ser trocado por uma **imagem sua** (veja [Banner personalizado](#banner-personalizado))
+- **Tudo em português**, com acentos (á à â ã é ê í ó ô õ ú ç) desenhados no estilo da fonte original,
+  ou **em inglês**: o idioma é escolhido no menu (veja [Idioma](#idioma--language))
+- **7 temas** completos (banner no topo, wallpaper atrás da lista e cores), todos num arquivo só no
+  cartão (`/EDMD/TEMAS.BIN`) e escolhidos no menu: PADRÃO, RG POA, SEGA 16, OUTRUN, SYNTHWAVE,
+  MADDRUGA e RETROCHIMP (veja [Temas](#temas)); banner e wallpaper também podem ser **imagens suas**
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
   nos recentes; o último item da lista, **[ LIMPAR RECENTES ]** (com uma faixa vermelha atrás), apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
@@ -44,9 +46,6 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
   pasta onde você estava
 - **Capas (box art)** dos jogos, lidas de `/EDMD/ART` no cartão SD
 - **Info da ROM**: nome, console, copyright, serial, região, checksum e tamanho lidos do cabeçalho SEGA
-- **4 temas de cores**: PADRÃO, RG POA, SEGA 16 e OUTRUN
-- **Wallpaper** atrás da lista de jogos e dos menus (veja [Wallpaper](#wallpaper)), com uma arte
-  retrô própria inclusa, livre para compartilhar
 
 | | | |
 |---|---|---|
@@ -55,7 +54,7 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 | ![Busca: modos](v1mod/screens/busca_modos.png) | ![Busca: teclado](v1mod/screens/busca_teclado.png) | ![Busca: resultados](v1mod/screens/busca_resultados.png) |
 | Busca em todas as pastas (C) | Busca por nome: teclado na tela | Resultados: `[*]` ao lado da página, B volta |
 
-![Temas](v1mod/screens/temas.png)
+![Os 7 temas](temas/previa_temas.png)
 
 | | |
 |---|---|
@@ -109,7 +108,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.26**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema · Idioma. A versão do mod aparece no rodapé (**PT-BR 1.27**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -147,7 +146,8 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.26**.
+O tema fica em **Opções → Tema Visual** (o novo aparece ao voltar para a lista) e o idioma em
+**Opções → Idioma** (vale ao ligar o console de novo). Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.27**.
 
 ### Unbrick - recuperar v3 travado
 O OS v3 original do fabricante tem uma "proteção": ao iniciar um jogo num cartucho que ele não
@@ -172,8 +172,10 @@ fabricante** num clone: ele trava o cartucho de novo.
 ## Banner personalizado
 
 O banner do topo (lista de jogos, menus, menu do jogo, Info da ROM) pode ser uma imagem colorida.
-Sem o arquivo, aparece o banner "RETROGAMER POA" padrão. O repositório e os zips da release já trazem
-um banner retrô próprio em `sd/EDMD/BANNER.ART` (gerado por [`arte/gen_arte.py`](arte/gen_arte.py)).
+Com o `/EDMD/TEMAS.BIN` no cartão, o banner vem do tema escolhido; o `BANNER.ART` avulso só vale
+**sem** o `TEMAS.BIN` (ou faça um tema seu: veja [Temas](#temas)). Sem nenhum dos dois, aparece o banner
+"RETROGAMER POA" padrão. O repositório traz um banner retrô próprio em `sd/EDMD/BANNER.ART` (gerado por
+[`arte/gen_arte.py`](arte/gen_arte.py)).
 
 - Tamanho: **288×24 px** (36×3 tiles), até **13 cores** (a paleta do Mega Drive tem 512 cores; o
   conversor ajusta). A cor 1 da paleta fica reservada para o vermelho da faixa de destaque dos menus.
@@ -191,9 +193,9 @@ precisam ser convertidos de novo.
 
 ## Wallpaper
 
-Uma imagem atrás da lista de jogos e dos menus, em `/EDMD/WALL.ART` (vale para v1 / v2 e v3). Sem o
-arquivo, o fundo continua liso. O repositório e os zips da release já trazem um wallpaper retrô
-próprio (`sd/EDMD/WALL.ART`, de [`arte/gen_arte.py`](arte/gen_arte.py)).
+Uma imagem atrás da lista de jogos e dos menus, em `/EDMD/WALL.ART` (vale para v1 / v2 e v3). Como o
+banner, o `WALL.ART` avulso só vale **sem** o `TEMAS.BIN`. Sem o arquivo, o fundo continua liso. O
+repositório traz um wallpaper retrô próprio (`sd/EDMD/WALL.ART`, de [`arte/gen_arte.py`](arte/gen_arte.py)).
 
 - Tamanho **320×224 px**, até **14 cores**; o preto puro fica transparente e mostra a cor de fundo do tema.
 - Use uma imagem **escura**: o texto da lista fica por cima. O conversor escurece com `--dim`.
@@ -207,27 +209,46 @@ python make_wallpaper.py meu_wallpaper.png E:/EDMD/WALL.ART --dim 0.55
 
 ## Temas
 
-Um tema é um banner + wallpaper, e o banner pode trazer também as **cores** do tema (fundo, faixa do
-menu, texto). Basta copiar a pasta `EDMD` do zip do tema para a raiz do cartão (substitui o
-`BANNER.ART` e o `WALL.ART`); vale para v1 / v2 e v3. Com um banner que traz cores, elas valem no lugar do
-tema escolhido no cartucho (na v1 / v2 o item aparece como **Tema: DO BANNER**); para voltar aos temas do
-cartucho, use um banner sem cores (o do zip principal).
+Um tema é um banner + wallpaper + as **cores** dos menus (fundo, faixa do menu, texto). Os 7 temas ficam
+num arquivo só, **`/EDMD/TEMAS.BIN`** (já vem nos zips da release), e são escolhidos no cartucho: na
+v1 / v2 pelo item **Tema** do menu principal (o tema troca na hora), na v3 em **Opções → Tema Visual**
+(o tema novo aparece ao voltar para a lista). Toda a arte é própria, gerada por
+[`arte/gen_temas.py`](arte/gen_temas.py), livre para compartilhar.
 
-| Tema | Arquivo na release | Fonte |
-|---|---|---|
-| **Maddrugamers**, para o canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers): preto, letreiro verde com sombra 3D e joysticks | `Tema-Maddrugamers.zip` | [`temas/maddrugamers`](temas/maddrugamers), gerado por [`arte/gen_maddruga.py`](arte/gen_maddruga.py) (arte própria) |
+![Os 7 temas](temas/previa_temas.png)
 
-| v1 / v2 | v3 |
+| Tema | Visual |
 |---|---|
-| ![Maddrugamers na v1 / v2: menu](temas/maddrugamers/previa_v1_menu.png) | ![Maddrugamers na v3: menu](temas/maddrugamers/previa_v3_menu.png) |
-| ![Maddrugamers na v1 / v2: lista](temas/maddrugamers/previa_v1.png) | ![Maddrugamers na v3: lista](temas/maddrugamers/previa_v3.png) |
+| **PADRÃO** | "EVERDRIVE MD" cromado sobre uma placa de circuito, preto e ciano |
+| **RG POA** | "RETROGAMER POA" dourado, pôr do sol no Guaíba com a chaminé do Gasômetro |
+| **SEGA 16** | "16-BIT POWER" azul cromado, piso xadrez e um planeta com anel |
+| **OUTRUN** | estrada ao pôr do sol com palmeiras, rosa e laranja |
+| **SYNTHWAVE** | a arte retrô original do mod: sol listrado, montanhas e grade roxa |
+| **MADDRUGA** | do canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers): letreiro verde com sombra 3D e joysticks |
+| **RETROCHIMP** | do grupo Retrochimp Games: listras anos 70, letreiro creme com sombra colorida, o chimpanzé de óculos e boné |
 
-Para criar um tema com cores, use `--cores` no conversor do banner (cores do Mega Drive em hexadecimal
-`0BGR`, só dígitos pares: fundo, faixa do menu, sombra da faixa, texto, texto apagado, destaque):
+Sem o `TEMAS.BIN`, valem os arquivos avulsos `BANNER.ART` e `WALL.ART` (veja acima) e os 4 conjuntos de
+cores embutidos no firmware (PADRÃO, RG POA, SEGA 16 e OUTRUN).
+
+**Criar um tema:** coloque o `BANNER.ART` (com as cores, via `--cores`) e o `WALL.ART` numa pasta
+`temas/<nome>/EDMD/`, acrescente a pasta e o nome (até 10 letras) na lista `ORDER` do
+[`make_temas.py`](make_temas.py) e gere o arquivo de novo (até 16 temas). As cores do Mega Drive vão em
+hexadecimal `0BGR`, só dígitos pares: fundo, faixa do menu, sombra da faixa, texto, texto apagado, destaque.
 
 ```
-python make_banner.py meu_banner.png E:/EDMD/BANNER.ART --cores 000,0A0,040,EEE,4C4,2E4
+python make_banner.py meu_banner.png temas/meu/EDMD/BANNER.ART --cores 000,0A0,040,EEE,4C4,2E4
+python make_wallpaper.py meu_wallpaper.png temas/meu/EDMD/WALL.ART --dim 0.55
+python make_temas.py E:/EDMD/TEMAS.BIN
 ```
+
+## Idioma / Language
+
+O mod pode mostrar tudo em **português** (padrão) ou em **inglês**: na v1 / v2 pelo item **Idioma** do
+menu principal (troca na hora), na v3 em **Opções → Idioma** (vale ao ligar o console de novo). A escolha
+fica salva no cartucho.
+
+*The mod can show everything in **English**: v1 / v2 main menu → "Idioma" (switches at once); v3
+"Opções" → "Idioma" (after a power cycle).*
 
 ## Capas (box art)
 
@@ -239,8 +260,7 @@ O repositório já traz **2176 capas prontas** em [`sd/EDMD/ART`](sd/EDMD/ART) (
 ```
 Cartão SD (E:\)
 ├── EDMD\
-│   ├── BANNER.ART        (banner, opcional)
-│   ├── WALL.ART          (wallpaper, opcional)
+│   ├── TEMAS.BIN         (os temas: banner, wallpaper e cores)
 │   ├── MDOS.BIN          (só v3: o firmware)
 │   ├── ART\
 │   │   ├── 0C4F65A0.ART

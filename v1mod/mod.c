@@ -18,9 +18,10 @@
 
 typedef struct {
     u32 magic;
-    u16 theme;
+    u16 theme;                          /* a theme of TEMAS.BIN, or (without it) one of the 4 built-in */
     u16 count[2];                       /* [0] recent, [1] favourites */
-    u16 pad[3];
+    u16 lang;                           /* 1 = English */
+    u16 pad[2];
 } ListHdr;
 
 typedef struct {
@@ -52,6 +53,11 @@ static u32 gRand;
 static char gArtName[24];
 static char gArtPath[40];
 static char gThemeItem[24];
+static char gLangItem[24];
+u8 gLang;                               /* 1 = English: gen.h picks the strings, patchOs(2) the OS ones */
+#define PACK_MAX 16
+static u8 gPackN;                       /* themes in /EDMD/TEMAS.BIN (make_temas.py), 0 = no such file */
+static char gPackName[PACK_MAX][11];
 static char gItemBuf[LIST_MAX][38];
 static const char *gItems[LIST_MAX + 2];
 static u8 gSector0[512] __attribute__((aligned(4)));   /* SD/OS routines access it by words */
@@ -204,13 +210,49 @@ static void applyTheme(void)
 
 static int readArtFile(u16 tile, u16 *pal, int abortable);
 
+/* /EDMD/TEMAS.BIN (make_temas.py), sector 0: 'TMAS', u16 count, then the 16-byte names from 0x10 */
+static void readPack(void)
+{
+    int i, j;
+    u16 n;
+    if (osFind(S_temas_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0) || osRead(gArtBuf, 1)
+        || *(const u32 *)gArtBuf != 0x544D4153)
+        return;
+    n = ((const u16 *)gArtBuf)[2];
+    if (n > PACK_MAX)
+        n = PACK_MAX;
+    for (i = 0; i < n; i++) {
+        const u8 *src = gArtBuf + 16 + i * 16;
+        for (j = 0; j < 10 && src[j]; j++)
+            gPackName[i][j] = src[j] >= 0x80 && src[j] < 0x88 ? v3acc[src[j] - 0x80] : src[j];
+        gPackName[i][j] = 0;
+    }
+    gPackN = n;
+    if (gTheme >= n)
+        gTheme = 0;
+}
+
+/* open the banner (sector 0) or the wallpaper (sector 8) of the chosen theme in TEMAS.BIN (theme t at
+ * sector 1 + t * 64), or without that file the file of its own; 1 = open */
+static int openArt(const char *path, u32 sector)
+{
+    if (gPackN && !osFind(S_temas_path, &gTmp, 0) && !gTmp.isdir && !osOpen(&gTmp, 0)) {
+        u32 skip = 1 + ((u32)gTheme << 6) + sector;
+        while (skip--)
+            if (osRead(gArtBuf, 1))
+                return 0;
+        return 1;
+    }
+    return !(osFind(path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0));
+}
+
 /* /EDMD/BANNER.ART: same layout as a box-art file, 36x3 tiles (288x24 px), optionally followed by the
  * theme colours (make_banner.py --cores): 'TEMA' + 6 words at file offset 0xDA0 (sector 6, + 0x1A0) */
 static void loadBanner(void)
 {
     const u32 *t = (const u32 *)(gArtBuf + 0x1A0);
-    if (osFind(S_banner_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0)
-        || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0))
+    gHasFileTheme = 0;
+    if (!openArt(S_banner_path, 0) || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0))
         return;
     if (*t == 0x54454D41) {             /* readArtFile leaves the last sector in gArtBuf */
         memcpy(gFileTheme, t + 1, sizeof(gFileTheme));
@@ -228,7 +270,8 @@ static void loadWallpaper(void)
     u32 b = 0, n = 0;
     int s, i;
 
-    if (osFind(S_wall_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0))
+    gWall = 0;
+    if (!openArt(S_wall_path, 8))
         return;
     for (s = 0;; s++) {
         if (osRead(gArtBuf, 1))
@@ -259,6 +302,7 @@ __attribute__((noinline)) static void loadImagesOnce(void)
             return;
         FAT_READY = 1;
     }
+    readPack();
     loadBanner();
     loadWallpaper();
 }
@@ -426,6 +470,7 @@ static void scratchLoad(void)
         SCR_HDR->magic = LIST_MAGIC;
     }
     SCR_HDR->theme = gTheme;
+    SCR_HDR->lang = gLang;
 }
 
 static void scratchCommit(void)
@@ -918,7 +963,7 @@ static void listMenu(int l)
         }
         sel = r;
         if (l) {
-            static const char *const sub[] = {S_fv_play, S_fv_remove, S_back};
+            const char *const sub[] = {S_fv_play, S_fv_remove, S_back};
             u8 s;
             gTitle = gItemBuf[r];
             gOverlay = overlayTitle;
@@ -1192,7 +1237,7 @@ static int neighbourRom(int idx, int dir)
  * LEFT/RIGHT switch to the previous/next game; the returned index becomes the browser cursor. */
 u32 fileMenuFromBrowser(u32 idx)
 {
-    static const char *const items[] = {S_fm_load_start, S_fm_load_only, S_fm_cheats, S_fm_add_fav, S_fm_rom_info,
+    const char *const items[] = {S_fm_load_start, S_fm_load_only, S_fm_cheats, S_fm_add_fav, S_fm_rom_info,
                                         S_back};
     u8 sel = 0, r;
     char title[40];
@@ -1284,14 +1329,38 @@ void myAbout(void)
     osSetColor(3, 15, 0xF00);
 }
 
+static int patchOs(int mode);
+
+/* with TEMAS.BIN: the next theme of the file, its banner, wallpaper and colours load at once;
+ * without it: the next built-in colour set (unless BANNER.ART brings its own colours) */
 static void cycleTheme(void)
 {
-    if (gHasFileTheme) {                /* the banner's colours win over the themes */
-        info(S_thm_locked);
-        return;
+    if (gPackN) {
+        u32 keep = DIR_CLUSTER();
+        gTheme = gTheme + 1 >= gPackN ? 0 : gTheme + 1;
+        center(S_thm_loading, PAL1, 23);
+        gBanner = 1;
+        loadBanner();
+        loadWallpaper();
+        DIR_CLUSTER() = keep;
+    } else {
+        if (gHasFileTheme) {            /* the banner's colours win over the themes */
+            info(S_thm_locked);
+            return;
+        }
+        gTheme = (gTheme + 1) & 3;
     }
-    gTheme = (gTheme + 1) & 3;
     applyTheme();
+    center(S_saving, PAL1, 24);
+    scratchLoad();
+    scratchCommit();
+}
+
+/* Portuguese <-> English: our strings follow gLang, the stock ones are patched back and forth */
+static void toggleLang(void)
+{
+    gLang ^= 1;
+    patchOs(2);
     center(S_saving, PAL1, 23);
     scratchLoad();
     scratchCommit();
@@ -1299,28 +1368,31 @@ static void cycleTheme(void)
 
 void myMainMenu(void)
 {
-    static const char *const thm[] = {S_thm0, S_thm1, S_thm2, S_thm3};
-    static const char *const items[8] = {S_mm_play, S_mm_select, S_mm_recent, S_mm_fav, S_mm_random,
-                                         S_mm_options, S_mm_cheats, S_mm_tools};
     if (!gBanner)
         loadImages();                   /* the banner may bring its own colours (theme item below) */
     for (;;) {
+        const char *const thm[] = {S_thm0, S_thm1, S_thm2, S_thm3};
+        const char *const items[8] = {S_mm_play, S_mm_select, S_mm_recent, S_mm_fav, S_mm_random,
+                                      S_mm_options, S_mm_cheats, S_mm_tools};
         u8 r;
         memcpy(gItems, items, sizeof(items));
-        scpy(scpy(gThemeItem, S_mm_theme), gHasFileTheme ? S_thm_banner : thm[gTheme & 3]);
+        scpy(scpy(gThemeItem, S_mm_theme), gPackN ? gPackName[gTheme] : gHasFileTheme ? S_thm_banner
+                                                                                    : thm[gTheme & 3]);
         gItems[8] = gThemeItem;
+        scpy(scpy(gLangItem, S_mm_lang), gLang ? S_lang_en : S_lang_pt);
+        gItems[9] = gLangItem;
 #ifdef DIAG
-        gItems[9] = DS_menu;
-        r = osMenu(gItems, 10, 2, gMainSel, 1);
-        if (r == 9) {
+        gItems[10] = DS_menu;
+        r = osMenu(gItems, 11, 2, gMainSel, 1);
+        if (r == 10) {
             gMainSel = r;
             diagChip();
             continue;
         }
 #else
-        r = osMenu(gItems, 9, 2, gMainSel, 1);
+        r = osMenu(gItems, 10, 2, gMainSel, 1);
 #endif
-        if (r >= 9)
+        if (r >= 10)
             continue;
         gMainSel = r;
         switch (r) {
@@ -1333,6 +1405,7 @@ void myMainMenu(void)
         case 6: osCheats(); break;
         case 7: osToolbox(); break;
         case 8: cycleTheme(); break;
+        case 9: toggleLang(); break;
         }
     }
 }
@@ -1342,8 +1415,10 @@ static void myInit(void)
     memset(bssStart, 0, bssEnd - bssStart);
     memcpy(ramStubRam, ramStubStart, ramStubEnd - ramStubStart);
     gRand = VBCOUNT ^ HVCOUNT;
-    if (flashValid())
-        gTheme = FLASH_HDR->theme & 3;
+    if (flashValid()) {
+        gTheme = FLASH_HDR->theme & 0xFF;
+        gLang = FLASH_HDR->lang & 1;
+    }
     uploadExtraTiles();
     applyTheme();
 }
@@ -1353,23 +1428,30 @@ static void myInit(void)
 /* ---------------------------------------------------------------- extension entry */
 
 /* RAM patches of the OS (hooks, translated strings), written into patchTab (hooks.S) by the build: per
- * patch u32 address, u16 length n, the n stock bytes, the n new bytes; length 0 ends it */
+ * patch u32 address, u16 length n (bit 15: a translation, undone in English), the n stock bytes, the n
+ * new bytes; length 0 ends it. mode 0: check the stock bytes, 1: patch, 2: the translations only */
 extern const u8 patchTab[];
 
-static int patchOs(int write)
+static int patchOs(int mode)
 {
     const u8 *p = patchTab;
     for (;;) {
         u8 *dst = *(u8 *const *)p;
         u16 n = *(const u16 *)(p + 4), i;
+        int tr = n & 0x8000;
         if (!n)
             return 1;
+        n &= 0x7FFF;
         p += 6;
-        for (i = 0; i < n; i++)
-            if (write)
-                dst[i] = p[n + i];
-            else if (dst[i] != p[i])
-                return 0;
+        if (mode == 0) {
+            for (i = 0; i < n; i++)
+                if (dst[i] != p[i])
+                    return 0;
+        } else if (mode == 1 || tr) {
+            const u8 *src = tr && gLang ? p : p + n;
+            for (i = 0; i < n; i++)
+                dst[i] = src[i];
+        }
         p += 2 * n;
     }
 }
@@ -1380,8 +1462,8 @@ static u32 extMain(void)
 {
     if (!patchOs(0))
         return 0;
+    myInit();                           /* gLang first: the translations follow it */
     patchOs(1);
-    myInit();
     myMainMenu();
     return 0;
 }
