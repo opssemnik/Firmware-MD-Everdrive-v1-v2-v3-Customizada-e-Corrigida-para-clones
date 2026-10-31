@@ -10,8 +10,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
 | EverDrive-MD **v1 / v2** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
-| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `6601276f2cc193001d18036e91c0770aea0e35d16183f6d4b28cee2f9a901563` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `5adad0bf75ee15a8193a76eb0676219881f3a8ac6d8e3390395e58d87039794f` |
+| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `3693414389d0f2065578085bcd1e760df9b3c58304df709c936a6fd4dca32ee8` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `d7582c13c448093495f05f7d6fcc7b4274143a7e7a2a4fb93e6057e3dfefd302` |
 
 **Releases** ([página de Releases](../../releases)): os firmwares e os temas:
 
@@ -21,6 +21,7 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | `SD-EverDrive-v1-v2-sem-capas.zip` | **v1 / v2**, só o firmware e a extensão (`OS-V38-PTBR-<versão>.BIN` + `EDMD/V1EXT.BIN`) |
 | `MDOS.BIN` | firmware da **v3**, já com o nome certo |
 | `SD-EverDrive-v3.zip` | **v3**, para a raiz do cartão SD: `EDMD/MDOS.BIN` (o firmware), capas, banner e wallpaper |
+| `Unbrick-Recuperar-EverDrive-v3.zip` | **v3 travado** pela proteção do OS original ("EverDrive clone detected"): o OS PT-BR com o reparo do boot - veja [Unbrick](#unbrick---recuperar-v3-travado) |
 | `Tema-Maddrugamers.zip` | tema do canal [Maddrugamers](https://www.youtube.com/@maddrugamers) (v1 / v2 e v3): `EDMD/BANNER.ART` + `EDMD/WALL.ART`, com as cores do tema dentro do banner - veja [Temas](#temas) |
 
 > ⚠️ Projeto independente, sem relação com a Krikzz. O EverDrive e o OS original são obra de
@@ -108,7 +109,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.25**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema. A versão do mod aparece no rodapé (**PT-BR 1.26**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -146,7 +147,25 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
-O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.25**.
+O tema visual fica em **Opções → Tema Visual**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.26**.
+
+### Unbrick - recuperar v3 travado
+O OS v3 original do fabricante tem uma "proteção": ao iniciar um jogo num cartucho que ele não
+reconhece como original, grava um zero no setor de boot da flash, e dali em diante o cartucho só mostra
+*"EverDrive clone detected ... Device locked permanently"*. O `Unbrick-Recuperar-EverDrive-v3.zip`
+traz o OS PT-BR com o reparo desse setor:
+
+1. Extraia o zip na raiz do cartão SD (ele traz `EDMD/MDOS.BIN` e um `LEIA-ME.txt`).
+2. Ligue e entre na lista de jogos: a tela de reparo confere o boot (alguns segundos).
+3. Se aparecer **"O boot difere da imagem limpa"**, aperte **A** e espere **"Reparo feito e conferido!"**.
+   Não desligue durante a gravação.
+4. Desligue e ligue de novo: o OS PT-BR abre normalmente. Depois volte para o `MDOS.BIN` normal da
+   release (o de reparo confere o boot a cada vez que liga, o que deixa o boot uns segundos mais lento).
+
+Erros **01 a 05** acontecem antes de gravar qualquer coisa (cartucho não reconhecido ou imagem ruim):
+**A** segue para o OS. Erro **10** ou mais aconteceu durante a gravação: anote o código. O reparo só
+conserta o setor de boot; outros danos precisam de um gravador externo. **Nunca use o OS v2 original do
+fabricante** num clone: ele trava o cartucho de novo.
 
 ---
 

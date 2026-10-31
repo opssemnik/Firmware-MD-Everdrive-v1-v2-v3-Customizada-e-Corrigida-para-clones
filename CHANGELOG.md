@@ -6,6 +6,9 @@
 
 ## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
 
+### 1.26 — 2026-10-30
+- Sem mudanças além da versão (mesma numeração da v3). Quem já está na 1.22 ou mais nova só troca o `EDMD/V1EXT.BIN`.
+
 ### 1.25 — 2026-10-24
 - O firmware nos zips agora leva a versão no nome: **`OS-V38-PTBR-1.25.BIN`** (o conteúdo é o mesmo carregador desde a 1.22: quem já gravou não precisa gravar de novo, só trocar o `EDMD/V1EXT.BIN`).
 
@@ -140,6 +143,9 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.26 — 2026-10-30
+- Novo **Unbrick - Recuperar** (`Unbrick-Recuperar-EverDrive-v3.zip`, à parte): o OS PT-BR com o reparo do setor de boot para cartuchos v3 travados pela proteção do OS original ("EverDrive clone detected ... Device locked permanently"). Na lista de jogos ele confere o boot; se estiver diferente, **A** regrava e confere os 64 KB. Depois é só voltar para o `MDOS.BIN` normal.
 
 ### 1.25 — 2026-10-24
 - Sem mudanças além da versão (mesma numeração da v1 / v2).
