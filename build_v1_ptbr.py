@@ -26,7 +26,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.27'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.28'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     # /EDMD/V1EXT.BIN on the SD card
@@ -474,7 +474,9 @@ def main():
     # Browser layout: banner rows 0-2, a blank row, list rows 4-24 (stock 2-22), a blank row, page
     # counter on row 26 (stock 23), file name bar on row 27 only (stock 24-25, two lines): the name is
     # one line of up to 38 characters (stock 36 + a second line for long names)
-    for ram, old, new in ((0xFF657E, '48780002', '48780004'),                    # first list row
+    # (1.27: help line on row 3, a blank row, list rows 5-25; folder changes clear rows 0-25)
+    for ram, old, new in ((0xFF657E, '48780002', '48780005'),                    # first list row
+                          (0xFF6656, '48780019', '4878001a'), (0xFF6798, '48780019', '4878001a'),
                           (0xFF6258, '48780002', '48780001'), (0xFF625C, '48780024', '48780026'),
                           (0xFF6260, '48780018', '4878001b'),                    # name clear: row 27, 38 wide
                           (0xFF6276, '48780024', '48780026'), (0xFF627A, '48780018', '4878001b'),  # name

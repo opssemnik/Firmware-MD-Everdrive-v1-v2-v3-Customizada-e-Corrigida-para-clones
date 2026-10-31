@@ -276,7 +276,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.27'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.28'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -2506,7 +2506,7 @@ def build_custom_mdos():
     #     counter ("Pág. x de y", was on the top bar) on row 26, file name bar on row 27 only: one line
     #     of up to 38 characters (was 32 + a second line for long names on 26-27).
     assert rom[0x0926:0x0928] == bytes.fromhex('7c03')
-    rom[0x0927] = 4                                  # first list row
+    rom[0x0927] = 5                                  # first list row (1.27: help row 3, blank row 4)
     assert rom[0x09E2:0x09E6] == bytes.fromhex('48780001')
     rom[0x09E5] = 26                                 # page counter row
     for off, old, new in ((0x0976, 0x02, 0x01), (0x09AA, 0x02, 0x01),     # name bar fills: 1 row high

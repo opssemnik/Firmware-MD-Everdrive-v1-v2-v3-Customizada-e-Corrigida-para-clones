@@ -24,3 +24,7 @@ mcopy -o -i sdm.img "$R/temas/maddrugamers/EDMD/WALL.ART" ::/EDMD/WALL.ART
 # sdt.img = sd.img + /EDMD/TEMAS.BIN (make_temas.py: every theme in one file)
 cp sd.img sdt.img
 mcopy -o -i sdt.img "$R/sd/EDMD/TEMAS.BIN" ::/EDMD/TEMAS.BIN
+# sdbig.img = sdt.img + /MUITOS with 30 small ROM files (a full page of 21 + a second page)
+cp sdt.img sdbig.img
+mmd -i sdbig.img ::/MUITOS
+for i in $(seq -w 1 30); do head -c 1024 /dev/zero > /tmp/JOGO$i.BIN; mcopy -o -i sdbig.img /tmp/JOGO$i.BIN ::/MUITOS/JOGO$i.BIN; done

@@ -6,6 +6,8 @@ Original pixel art for the themes in TEMAS.BIN (no copied images, no third-party
   - outrun     : "OUTRUN" over a sunset road with palm trees
   - retrochimp : "RETROCHIMP" in cream with a 70s rainbow shadow, a chimp with glasses and cap
   - synthwave  : the original synthwave art (gen_arte.py), now with its own colours
+  - maddrugamers: gen_maddruga.py's art
+Every banner keeps 20 rows of its art and ends in 4 black rows (room above the help line).
 Each theme gets temas/<name>/EDMD/BANNER.ART (with the theme colours) and WALL.ART, plus PNG
 previews in arte/temas/. make_temas.py then packs every theme into /EDMD/TEMAS.BIN.
 
@@ -32,7 +34,10 @@ CORES = {
     'outrun':     '202,A0A,606,EE0,A4A,E4E',
     'synthwave':  '202,A0A,404,EEE,A6A,0AE',
     'retrochimp': '000,04C,026,CEE,68A,0CE',
+    'maddrugamers': '000,0A0,040,EEE,4C4,2E4',     # = gen_maddruga.py
 }
+GAP = 4                 # black rows under each banner: room above the help line (1.27)
+CROP = {'padrao': 2, 'rgpoa': 2, 'sega16': 2, 'outrun': 1, 'retrochimp': 2, 'synthwave': 2, 'maddrugamers': 1}
 
 FONT = {    # 7x6, the OS font style
     'A': ["..##...", ".####..", "##..##.", "##..##.", "######.", "##..##."],
@@ -603,9 +608,22 @@ THEMES = {
 }
 
 
+def with_gap(name, src):
+    """the banner's 24 rows -> the 20 that matter (from CROP[name]) + GAP black rows at the bottom"""
+    im = Image.open(src).convert('RGB')
+    s = CROP[name]
+    out = Image.new('RGB', (288, 24), BLACK)
+    out.paste(im.crop((0, s, 288, s + 24 - GAP)), (0, 0))
+    dst = PREV / f'{name}_banner.png'
+    out.save(dst)
+    out.resize((288 * 3, 24 * 3), Image.NEAREST).save(PREV / f'{name}_banner_3x.png')
+    return dst
+
+
 def convert(name, banner_png, wall_png, dim=None):
     pack = ROOT / 'temas' / name / 'EDMD'
     pack.mkdir(parents=True, exist_ok=True)
+    banner_png = with_gap(name, banner_png)
     wall = [sys.executable, ROOT / 'make_wallpaper.py', wall_png, pack / 'WALL.ART']
     if dim:
         wall += ['--dim', str(dim)]
@@ -621,12 +639,13 @@ def main():
         if only and name not in only:
             continue
         bi, wi = b(), w()
-        bi.save(PREV / f'{name}_banner.png')
-        bi.resize((288 * 3, 24 * 3), Image.NEAREST).save(PREV / f'{name}_banner_3x.png')
+        bi.save(PREV / f'{name}_banner_full.png')
         wi.save(PREV / f'{name}_wallpaper.png')
-        convert(name, PREV / f'{name}_banner.png', PREV / f'{name}_wallpaper.png')
+        convert(name, PREV / f'{name}_banner_full.png', PREV / f'{name}_wallpaper.png')
     if not only or 'synthwave' in only:
         convert('synthwave', HERE / 'banner.png', HERE / 'wallpaper.png')
+    if not only or 'maddrugamers' in only:     # gen_maddruga.py draws it
+        convert('maddrugamers', HERE / 'maddruga' / 'banner.png', HERE / 'maddruga' / 'wallpaper.png')
 
 
 if __name__ == '__main__':

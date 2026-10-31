@@ -7,6 +7,11 @@
 
 ## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
 
+### 1.28 — 2026-10-31
+- **Mais espaço na lista:** a linha de ajuda fica separada do banner e da lista de jogos (uma linha vazia antes da lista, que agora ocupa as linhas 5 a 25); os banners dos 7 temas ganharam uma folga embaixo. Continuam 21 jogos por página.
+- Tema **RETROCHIMP** em 3º, com a mensagem do grupo e um QR code para o WhatsApp do ADM.
+- Só o `V1EXT.BIN` mudou (e o `TEMAS.BIN`): quem já está na 1.22 ou mais nova troca o `EDMD/V1EXT.BIN` e o `EDMD/TEMAS.BIN`.
+
 ### 1.27 — 2026-10-31
 - **Temas num arquivo só:** `EDMD/TEMAS.BIN` traz 7 temas completos (banner, wallpaper e cores): PADRÃO, RG POA, o novo **RETROCHIMP** (grupo Retrochimp Games, com QR code para o WhatsApp do ADM), SEGA 16, OUTRUN, SYNTHWAVE e MADDRUGA. O item **Tema** do menu principal troca de tema na hora; a arte de PADRÃO, RG POA, SEGA 16, OUTRUN e RETROCHIMP é nova.
 - **Idioma / Language:** novo item **Idioma** no menu principal: português ou inglês (English), troca na hora e fica salvo no cartucho.
@@ -150,6 +155,10 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.28 — 2026-10-31
+- **Mais espaço na lista:** a linha de ajuda fica separada do banner e da lista de jogos (uma linha vazia antes da lista, que agora ocupa as linhas 5 a 25); os banners dos 7 temas ganharam uma folga embaixo. Continuam 21 jogos por página.
+- Tema **RETROCHIMP** em 3º, com a mensagem do grupo e um QR code para o WhatsApp do ADM. Troque também o `EDMD/TEMAS.BIN`.
 
 ### 1.27 — 2026-10-31
 - **Temas num arquivo só:** **Opções → Tema Visual** lista os 7 temas do `EDMD/TEMAS.BIN` (banner, wallpaper e cores); o tema novo aparece ao voltar para a lista de jogos.
