@@ -10,8 +10,8 @@ no Brasil e no exterior. Feito para o **Grupo RetroGamer Poa** por **Antonio e t
 | Cartucho | Arquivo | Base | SHA-256 |
 |---|---|---|---|
 | EverDrive-MD **v1 / v2** | [`OS-V38-PTBR.BIN`](OS-V38-PTBR.BIN) | OS v38 (dump de um v1 clone) + logo RetroGamer POA + carregador da extensão | `d279bc9f703ad21e8577a67aa73716f7b9313f64617dded169322bddc1a6727b` |
-| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `bb008216a28a0085904ddafa979cb0a76f1cf21dfd61c8ab7e6944329c19f353` |
-| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `8ce1435a83bd78e5631ef189c4fd05727d490ccb5ba62f31b04696adf83188b4` |
+| EverDrive-MD **v1 / v2** (extensão) | [`V1EXT.BIN`](V1EXT.BIN) (no cartão: `/EDMD/V1EXT.BIN`) | todo o mod da v1 / v2 | `3f9302e90ec8e03a66be04e77022e83ac1d2bb3597b9a47fefc2cf5d06efa2d1` |
+| EverDrive-MD **v3** | [`MDOS.ptbr.BIN`](MDOS.ptbr.BIN) (na release: `MDOS.BIN`) | `MDOS.patched` (OS v3 já usado em clones) | `976b1a994a1e2b5e2d9366adaf8c5f9e2896f4a1419b26689e90ea0084f0feab` |
 
 **Releases** ([página de Releases](../../releases)): os firmwares e os temas:
 
@@ -39,6 +39,8 @@ As duas versões têm o mesmo conjunto de recursos, adaptado a cada hardware:
 - **7 temas** completos (banner no topo, wallpaper atrás da lista e cores), todos num arquivo só no
   cartão (`/EDMD/TEMAS.BIN`) e escolhidos no menu: PADRÃO, RG POA, RETROCHIMP, SEGA 16, OUTRUN,
   SYNTHWAVE e MADDRUGA (veja [Temas](#temas)); banner e wallpaper também podem ser **imagens suas**
+- **Música no menu**: cada tema tem a sua música (composições próprias, som FM do Mega Drive), em loop,
+  e dá para desligar no menu (veja [Música](#música))
 - **Jogos recentes** e **Favoritos**, salvos no cartucho (sobrevivem ao desligar). Só ROMs entram
   nos recentes; o último item da lista, **[ LIMPAR RECENTES ]** (com uma faixa vermelha atrás), apaga a lista
 - **Jogo aleatório**: sorteia uma ROM da sua coleção
@@ -109,7 +111,7 @@ carregue os códigos e use *aplicar*) e, ao sair dele, inicia o jogo.
 **ESQ/DIR** no menu do jogo vai para o jogo anterior/seguinte da pasta (pula pastas e arquivos que não são ROM).
 
 Menu principal: Jogar último jogo · Selecionar jogo · Jogos recentes · Favoritos · Jogo aleatório ·
-Opções · Cheats · Ferramentas · Tema · Idioma. A versão do mod aparece no rodapé (**PT-BR 1.29**) e em Ferramentas → dispositivo.
+Opções · Cheats · Ferramentas · Tema · Idioma · Música. A versão do mod aparece no rodapé (**PT-BR 1.30**) e em Ferramentas → dispositivo.
 
 ### Detalhes
 - Recentes e Favoritos (8 de cada) ficam no mesmo bloco de flash das opções (`0x30000`); a flash só é regravada quando a lista muda.
@@ -148,7 +150,7 @@ qualquer botão a remove (a página é redesenhada). Rolar rápido não carrega 
 ![Capa na lista (v3)](v3/screens/lista_com_capa.png)
 
 O tema fica em **Opções → Tema Visual** (o novo aparece ao voltar para a lista) e o idioma em
-**Opções → Idioma** (o console reinicia sozinho para trocar). Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.29**.
+**Opções → Idioma** (o console reinicia sozinho para trocar) e a música em **Opções → Música**. Recentes/Favoritos (10 de cada) ficam na SRAM do cartucho. Em **Info Sistema** a versão aparece como **PT-BR 1.30**.
 
 ### Unbrick - recuperar v3 travado
 O OS v3 original do fabricante tem uma "proteção": ao iniciar um jogo num cartucho que ele não
@@ -210,7 +212,8 @@ python make_wallpaper.py meu_wallpaper.png E:/EDMD/WALL.ART --dim 0.55
 
 ## Temas
 
-Um tema é um banner + wallpaper + as **cores** dos menus (fundo, faixa do menu, texto). Os 7 temas ficam
+Um tema é um banner + wallpaper + as **cores** dos menus (fundo, faixa do menu, texto) + a **música** do
+menu (veja [Música](#música)). Os 7 temas ficam
 num arquivo só, **`/EDMD/TEMAS.BIN`** (já vem nos zips da release), e são escolhidos no cartucho: na
 v1 / v2 pelo item **Tema** do menu principal (o tema troca na hora), na v3 em **Opções → Tema Visual**
 (o tema novo aparece ao voltar para a lista). Toda a arte é própria, gerada por
@@ -218,15 +221,15 @@ v1 / v2 pelo item **Tema** do menu principal (o tema troca na hora), na v3 em **
 
 ![Os 7 temas](temas/previa_temas.png)
 
-| Tema | Visual |
-|---|---|
-| **PADRÃO** | "EVERDRIVE MD" cromado sobre uma placa de circuito, preto e ciano |
-| **RG POA** | "RETROGAMER POA" dourado, pôr do sol no Guaíba com a chaminé do Gasômetro |
-| **RETROCHIMP** | do grupo Retrochimp Games (importação de jogos japoneses): listras anos 70, letreiro creme com sombra colorida, o chimpanzé de óculos e boné e um QR code para o WhatsApp do ADM do grupo |
-| **SEGA 16** | "16-BIT POWER" azul cromado, piso xadrez e um planeta com anel |
-| **OUTRUN** | estrada ao pôr do sol com palmeiras, rosa e laranja |
-| **SYNTHWAVE** | a arte retrô original do mod: sol listrado, montanhas e grade roxa |
-| **MADDRUGA** | do canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers): letreiro verde com sombra 3D e joysticks |
+| Tema | Visual | Música |
+|---|---|---|
+| **PADRÃO** | "EVERDRIVE MD" cromado sobre uma placa de circuito, preto e ciano | groove eletrônico em lá menor |
+| **RG POA** | "RETROGAMER POA" dourado, pôr do sol no Guaíba com a chaminé do Gasômetro | milonga ao pôr do sol (baixo 3-3-2), mi menor |
+| **RETROCHIMP** | do grupo Retrochimp Games (importação de jogos japoneses): listras anos 70, letreiro creme com sombra colorida, o chimpanzé de óculos e boné e um QR code para o WhatsApp do ADM do grupo | funk anos 70 com baixo slap e clavinete |
+| **SEGA 16** | "16-BIT POWER" azul cromado, piso xadrez e um planeta com anel | rock 16 bits rápido, metais e lead |
+| **OUTRUN** | estrada ao pôr do sol com palmeiras, rosa e laranja | synthwave de estrada, baixo pulsando |
+| **SYNTHWAVE** | a arte retrô original do mod: sol listrado, montanhas e grade roxa | lenta e sonhadora, pads em dó menor |
+| **MADDRUGA** | do canal [youtube.com/@maddrugamers](https://www.youtube.com/@maddrugamers): letreiro verde com sombra 3D e joysticks | groove de fliperama de madrugada, sol menor |
 
 Sem o `TEMAS.BIN`, valem os arquivos avulsos `BANNER.ART` e `WALL.ART` (veja acima) e os 4 conjuntos de
 cores embutidos no firmware (PADRÃO, RG POA, SEGA 16 e OUTRUN).
@@ -240,6 +243,26 @@ hexadecimal `0BGR`, só dígitos pares: fundo, faixa do menu, sombra da faixa, t
 python make_banner.py meu_banner.png temas/meu/EDMD/BANNER.ART --cores 000,0A0,040,EEE,4C4,2E4
 python make_wallpaper.py meu_wallpaper.png temas/meu/EDMD/WALL.ART --dim 0.55
 python make_temas.py E:/EDMD/TEMAS.BIN
+```
+
+## Música
+
+Cada tema toca a sua música no menu, em loop (composições próprias, só o som FM do Mega Drive). Ela vem
+**ligada**; para desligar: na v1 / v2 pelo item **Música** do menu principal, na v3 em **Opções → Música**
+(a escolha fica salva no cartucho). A música para sozinha quando um jogo começa.
+
+Quem toca é o processador de som do console (o Z80), com um player próprio
+([`musica/z80drv.asm`](musica/z80drv.asm)) que fica na memória dele junto com a música do tema: ele não
+usa o barramento do processador principal, então a música não atrapalha a leitura do cartão nem a
+gravação dos jogos. As músicas são escritas em [`musica/make_musica.py`](musica/make_musica.py), que gera o
+`MUSICA.BIN` de cada tema (vai dentro do `TEMAS.BIN`) e uma prévia em `.vgm` de cada uma em
+[`musica/previa`](musica/previa) (toca em players de VGM, como o foobar2000 com o plugin de VGM ou o
+VGMPlay; também vem no `Musicas-previa-VGM.zip` da release).
+
+```
+pip install z80          (simula o Z80 para gerar as prévias)
+python musica/make_musica.py
+python make_temas.py
 ```
 
 ## Idioma / Language

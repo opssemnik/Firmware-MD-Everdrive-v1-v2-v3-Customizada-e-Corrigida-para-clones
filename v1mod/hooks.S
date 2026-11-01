@@ -180,6 +180,15 @@ ramPageCount:                   /* page counter (was the three "pag: x / y" prin
     movem.l (%sp)+, %d0-%d1/%a0-%a1
     rts
 
+    .globl  ramStartHook
+ramStartHook:                   /* osStartGame (was subq.w #4,a7; movem.l d2-d4/a2,-(a7) at $ff4f32): */
+    movem.l %d0-%d1/%a0-%a1, -(%sp)     /* the menu music stops first */
+    jsr     musicStop
+    movem.l (%sp)+, %d0-%d1/%a0-%a1
+    subq.w  #4, %sp
+    movem.l %d2-%d4/%a2, -(%sp)
+    jmp     0xFF4F38
+
     .globl  ramBrowserBanner
 ramBrowserBanner:               /* browser full redraw (was move.b #1,$ffe306 at $ff64a8) */
     move.b  #1, (0xFFE306).l

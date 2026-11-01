@@ -21,7 +21,8 @@ typedef struct {
     u16 theme;                          /* a theme of TEMAS.BIN, or (without it) one of the 4 built-in */
     u16 count[2];                       /* [0] recent, [1] favourites */
     u16 lang;                           /* 1 = English */
-    u16 pad[2];
+    u16 music;                          /* 1 = menu music off (1.30) */
+    u16 pad;
 } ListHdr;
 
 typedef struct {
@@ -57,9 +58,13 @@ static char gLangItem[24];
 u8 gLang;                               /* 1 = English: gen.h picks the strings, patchOs(2) the OS ones */
 #define PACK_MAX 16
 static u8 gPackN;                       /* themes in /EDMD/TEMAS.BIN (make_temas.py), 0 = no such file */
+static u16 gPackSlot, gPackMusic;       /* sectors per theme, music sector in a theme (0: no music) */
+static int gPackPos = -1;               /* next sector of TEMAS.BIN while it is open, -1 = closed */
+static u8 gMusicOff;                    /* 1 = no menu music */
+static char gMusicItem[24];
 static char gPackName[PACK_MAX][11];
 static char gItemBuf[LIST_MAX][38];
-static const char *gItems[LIST_MAX + 2];
+static const char *gItems[LIST_MAX + 4];    /* also the main menu: 11 items (+ diag) */
 static u8 gSector0[512] __attribute__((aligned(4)));   /* SD/OS routines access it by words */
 static u8 gArtBuf[512] __attribute__((aligned(4)));
 static u32 gArtHash;
@@ -215,10 +220,14 @@ static void readPack(void)
 {
     int i, j;
     u16 n;
+    gPackPos = -1;
     if (osFind(S_temas_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0) || osRead(gArtBuf, 1)
         || *(const u32 *)gArtBuf != 0x544D4153)
         return;
+    gPackPos = 1;                       /* the banner, wallpaper and music follow in the same pass */
     n = ((const u16 *)gArtBuf)[2];
+    gPackSlot = ((const u16 *)gArtBuf)[3];
+    gPackMusic = ((const u16 *)gArtBuf)[5];     /* 1.27-1.29 files: 64-sector slots, no music */
     if (n > PACK_MAX)
         n = PACK_MAX;
     for (i = 0; i < n; i++) {
@@ -232,18 +241,112 @@ static void readPack(void)
         gTheme = 0;
 }
 
-/* open the banner (sector 0) or the wallpaper (sector 8) of the chosen theme in TEMAS.BIN (theme t at
- * sector 1 + t * 64), or without that file the file of its own; 1 = open */
+/* TEMAS.BIN at a sector of the chosen theme (theme t at sector 1 + t * slot): forward from where the
+ * file already is (banner, wallpaper and music in one pass), else opened again; 1 = there */
+static int packSeek(u32 sector)
+{
+    u32 at = 1 + (u32)gTheme * gPackSlot + sector;
+    if (gPackPos < 0 || at < (u32)gPackPos) {
+        gPackPos = -1;
+        if (osFind(S_temas_path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0))
+            return 0;
+        gPackPos = 0;
+    }
+    while ((u32)gPackPos < at) {
+        if (osRead(gArtBuf, 1)) {
+            gPackPos = -1;
+            return 0;
+        }
+        gPackPos++;
+    }
+    return 1;
+}
+
+/* open the banner (sector 0) or the wallpaper (sector 8) of the chosen theme in TEMAS.BIN, or without
+ * that file the file of its own; 1 = open */
 static int openArt(const char *path, u32 sector)
 {
-    if (gPackN && !osFind(S_temas_path, &gTmp, 0) && !gTmp.isdir && !osOpen(&gTmp, 0)) {
-        u32 skip = 1 + ((u32)gTheme << 6) + sector;
-        while (skip--)
-            if (osRead(gArtBuf, 1))
-                return 0;
-        return 1;
-    }
+    if (gPackN)
+        return packSeek(sector);
     return !(osFind(path, &gTmp, 0) || gTmp.isdir || osOpen(&gTmp, 0));
+}
+
+/* ---- menu music (1.30): musica/z80drv.asm runs on the Z80 and plays the theme's song (TEMAS.BIN,
+ * MUSIC sector of the theme, 13 sectors -> Z80 RAM 0x0400) on the YM2612 */
+#define Z80_BUS (*(volatile u16 *)0xA11100)
+#define Z80_RST (*(volatile u16 *)0xA11200)
+#define Z80_RAM ((volatile u8 *)0xA00000)
+#define YM ((volatile u8 *)0xA04000)
+
+static void ymw(int part, u8 r, u8 v)
+{
+    while (YM[0] & 0x80)
+        ;
+    YM[part * 2] = r;
+    while (YM[0] & 0x80)
+        ;
+    YM[part * 2 + 1] = v;
+}
+
+/* Z80 bus to us (out of reset, so the bus can be granted), every FM key off, every TL at max */
+static void z80Hold(void)
+{
+    int i;
+    Z80_BUS = 0x100;
+    Z80_RST = 0x100;
+    while (Z80_BUS & 0x100)
+        ;
+    for (i = 0; i < 7; i++)
+        if (i != 3)
+            ymw(0, 0x28, i);
+    for (i = 0x40; i < 0x50; i++) {
+        ymw(0, i, 0x7F);
+        ymw(1, i, 0x7F);
+    }
+}
+
+static void z80Park(void)               /* Z80 held in reset, the bus back to it */
+{
+    Z80_RST = 0;
+    Z80_BUS = 0;
+}
+
+/* game start (ramStartHook at osStartGame): the music stops, the FM goes quiet */
+void musicStop(void)
+{
+    z80Hold();
+    z80Park();
+}
+
+static void loadMusic(void)
+{
+    int k, i;
+    z80Hold();
+    if (gMusicOff || !gPackN || !gPackMusic || !packSeek(gPackMusic)) {
+        z80Park();
+        return;
+    }
+    for (i = 0; i < Z80DRV_LEN; i++)
+        Z80_RAM[i] = z80drv[i];
+    for (k = 0; k < 13; k++) {
+        if (osRead(gArtBuf, 1)) {
+            gPackPos = -1;
+            z80Park();
+            return;
+        }
+        gPackPos++;
+        for (i = 0; i < 512; i++)
+            Z80_RAM[0x400 + k * 512 + i] = gArtBuf[i];
+    }
+    if (Z80_RAM[0x401] != 4) {          /* first command at 0x04xx: a song is there */
+        z80Park();
+        return;
+    }
+    Z80_RST = 0;
+    Z80_BUS = 0;
+    for (i = 0; i < 64; i++)
+        asm volatile("nop");
+    Z80_RST = 0x100;                    /* the Z80 runs the player */
 }
 
 /* /EDMD/BANNER.ART: same layout as a box-art file, 36x3 tiles (288x24 px), optionally followed by the
@@ -252,8 +355,12 @@ static void loadBanner(void)
 {
     const u32 *t = (const u32 *)(gArtBuf + 0x1A0);
     gHasFileTheme = 0;
-    if (!openArt(S_banner_path, 0) || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0))
+    if (!openArt(S_banner_path, 0) || !readArtFile(BANNER_IMG_TILE, gBannerPal, 0)) {
+        gPackPos = -1;
         return;
+    }
+    if (gPackPos >= 0)
+        gPackPos += 7;
     if (*t == 0x54454D41) {             /* readArtFile leaves the last sector in gArtBuf */
         memcpy(gFileTheme, t + 1, sizeof(gFileTheme));
         gHasFileTheme = 1;
@@ -274,8 +381,12 @@ static void loadWallpaper(void)
     if (!openArt(S_wall_path, 8))
         return;
     for (s = 0;; s++) {
-        if (osRead(gArtBuf, 1))
+        if (osRead(gArtBuf, 1)) {
+            gPackPos = -1;
             return;
+        }
+        if (gPackPos >= 0)
+            gPackPos++;
         if (!s) {
             n = ((u16 *)gArtBuf)[0];
             if (n > WALL_MAX)
@@ -305,6 +416,7 @@ __attribute__((noinline)) static void loadImagesOnce(void)
     readPack();
     loadBanner();
     loadWallpaper();
+    loadMusic();
 }
 
 static void loadImages(void)
@@ -501,6 +613,7 @@ static void scratchLoad(void)
     }
     SCR_HDR->theme = gTheme;
     SCR_HDR->lang = gLang;
+    SCR_HDR->music = gMusicOff;
 }
 
 static void scratchCommit(void)
@@ -1370,8 +1483,10 @@ static void cycleTheme(void)
         gTheme = gTheme + 1 >= gPackN ? 0 : gTheme + 1;
         center(S_thm_loading, PAL1, 23);
         gBanner = 1;
+        gPackPos = -1;
         loadBanner();
         loadWallpaper();
+        loadMusic();
         DIR_CLUSTER() = keep;
     } else {
         if (gHasFileTheme) {            /* the banner's colours win over the themes */
@@ -1381,6 +1496,19 @@ static void cycleTheme(void)
         gTheme = (gTheme + 1) & 3;
     }
     applyTheme();
+    center(S_saving, PAL1, 24);
+    scratchLoad();
+    scratchCommit();
+}
+
+/* menu music on / off: starts or stops at once */
+static void toggleMusic(void)
+{
+    u32 keep = DIR_CLUSTER();
+    gMusicOff ^= 1;
+    gPackPos = -1;
+    loadMusic();
+    DIR_CLUSTER() = keep;
     center(S_saving, PAL1, 24);
     scratchLoad();
     scratchCommit();
@@ -1411,18 +1539,20 @@ void myMainMenu(void)
         gItems[8] = gThemeItem;
         scpy(scpy(gLangItem, S_mm_lang), gLang ? S_lang_en : S_lang_pt);
         gItems[9] = gLangItem;
+        scpy(scpy(gMusicItem, S_mm_music), gMusicOff ? S_off : S_on);
+        gItems[10] = gMusicItem;
 #ifdef DIAG
-        gItems[10] = DS_menu;
-        r = osMenu(gItems, 11, 2, gMainSel, 1);
-        if (r == 10) {
+        gItems[11] = DS_menu;
+        r = osMenu(gItems, 12, 2, gMainSel, 1);
+        if (r == 11) {
             gMainSel = r;
             diagChip();
             continue;
         }
 #else
-        r = osMenu(gItems, 10, 2, gMainSel, 1);
+        r = osMenu(gItems, 11, 2, gMainSel, 1);
 #endif
-        if (r >= 10)
+        if (r >= 11)
             continue;
         gMainSel = r;
         switch (r) {
@@ -1436,6 +1566,7 @@ void myMainMenu(void)
         case 7: osToolbox(); break;
         case 8: cycleTheme(); break;
         case 9: toggleLang(); break;
+        case 10: toggleMusic(); break;
         }
     }
 }
@@ -1448,6 +1579,7 @@ static void myInit(void)
     if (flashValid()) {
         gTheme = FLASH_HDR->theme & 0xFF;
         gLang = FLASH_HDR->lang & 1;
+        gMusicOff = FLASH_HDR->music & 1;
     }
     uploadExtraTiles();
     applyTheme();

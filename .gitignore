@@ -33,6 +33,9 @@
 # temas prontos (banner + wallpaper + cores) para o cartão SD
 !/temas/
 
+# música do menu: player do Z80, compositor e prévias (composições próprias)
+!/musica/
+
 # código-fonte do mod v1 (sem a pasta build/, que é gerada)
 !/v1mod/
 /v1mod/build/

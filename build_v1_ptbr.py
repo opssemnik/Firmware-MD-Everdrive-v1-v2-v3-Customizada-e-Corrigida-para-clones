@@ -26,7 +26,7 @@ MOD = HERE / 'v1mod'
 BUILD = MOD / 'build'
 OS_IN = HERE / 'OS-V38.BIN'
 POA_IN = HERE / 'os-v36-retrogamer-poa.bin'
-MOD_VERSION = '1.29'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
+MOD_VERSION = '1.30'     # same number for v1 and v3 (main menu footer, Ferramentas -> dispositivo)
 DIAG = '--diag' in sys.argv     # diagnostics build: flash chip info + load timings
 OUT = HERE / ('OS-V38-PTBR-DIAG.BIN' if DIAG else 'OS-V38-PTBR.BIN')
 EXT_OUT = OUT.with_name(OUT.stem.replace('OS-V38-PTBR', 'V1EXT') + '.BIN')     # /EDMD/V1EXT.BIN on the SD card
@@ -66,6 +66,9 @@ C_STRINGS = {
     'S_lang_pt': 'PT-BR',
     'S_lang_en': 'ENGLISH',
     'S_temas_path': '/EDMD/TEMAS.BIN',
+    'S_mm_music': 'Música: ',
+    'S_on': 'LIG',
+    'S_off': 'DESL',
     'S_fm_load_start': 'Carregar e jogar',
     'S_fm_load_only': 'Só carregar',
     'S_fm_cheats': 'Jogar com cheats',
@@ -147,7 +150,7 @@ C_STRINGS_EN = {
     'S_mm_fav': 'Favorites', 'S_mm_random': 'Random game', 'S_mm_options': 'Options',
     'S_mm_tools': 'Tools', 'S_mm_theme': 'Theme: ', 'S_thm0': 'DEFAULT', 'S_thm_banner': 'BANNER',
     'S_thm_locked': 'The colours come from BANNER.ART', 'S_thm_loading': 'Loading the theme...',
-    'S_mm_lang': 'Language: ',
+    'S_mm_lang': 'Language: ', 'S_mm_music': 'Music: ', 'S_on': 'ON', 'S_off': 'OFF',
     'S_fm_load_start': 'Load and play', 'S_fm_load_only': 'Load only', 'S_fm_cheats': 'Play with cheats',
     'S_help': 'A: menu   START: play     C: search',
     'S_flt_num': '0 - 9 and others', 'S_fm_add_fav': 'Add to favorites', 'S_fm_rom_info': 'ROM info',
@@ -348,6 +351,7 @@ def c_bytes(b):
 def gen_sources(glyphs, banner):
     """gen.h / gen.c: glyph + banner data and all strings (all in the extension)."""
     assert not set(C_STRINGS_EN) - set(C_STRINGS), set(C_STRINGS_EN) - set(C_STRINGS)
+    z80drv = (HERE / 'musica' / 'z80drv.bin').read_bytes()     # make_musica.py / musica/build.sh
     strings = {name: enc(t) + b'\0' for name, t in C_STRINGS.items()}
     strings['S_banner'] = bytes(range(BANNER_BASE, BANNER_BASE + len(banner) // 16)) + b'\0'
     for addr, t in OS_REPOINT.items():
@@ -357,11 +361,13 @@ def gen_sources(glyphs, banner):
          f'#define NBANNER {len(banner) // 16}',
          'extern const unsigned char glyph1bpp[];', 'extern const unsigned char banner2bpp[];',
          'extern const unsigned char v3acc[8];       /* TEMAS.BIN names: v3 font codes 0x80.. -> ours */',
-         'extern unsigned char gLang;                /* 1 = English */']
+         'extern unsigned char gLang;                /* 1 = English */',
+         f'#define Z80DRV_LEN {len(z80drv)}', 'extern const unsigned char z80drv[];   /* musica/z80drv.bin */']
     c = ['#include "gen.h"',
          f'const unsigned char glyph1bpp[] = {{{c_bytes(sum(glyphs, []))}}};',
          f'const unsigned char banner2bpp[] = {{{c_bytes(banner)}}};',
-         f'const unsigned char v3acc[8] = {{{c_bytes(enc("çãõáéúóÃ"))}}};']
+         f'const unsigned char v3acc[8] = {{{c_bytes(enc("çãõáéúóÃ"))}}};',
+         f'const unsigned char z80drv[] = {{{c_bytes(z80drv)}}};']
     for name, data in strings.items():
         if name in C_STRINGS_EN:
             en = C_STRINGS_EN[name].encode('ascii') + b'\0'
@@ -495,6 +501,7 @@ def main():
     patch(0xFF64FC, bytes.fromhex('487800174878000142a73c03ccfc8619'),
           jsr(syms['ramPageCount']) + bytes.fromhex('4feffff0') + struct.pack('>Hh', 0x6000, disp) + b'\x4e\x71')
     patch(0xFF693E, bytes.fromhex('303900ffe30c'), jsr(syms['ramBrowserC']))       # C: search
+    patch(0xFF4F32, bytes.fromhex('594f48e73820'), struct.pack('>HI', 0x4EF9, syms['ramStartHook']))  # music stop
     patch(0xFF3FEC, bytes.fromhex('6100fd2e588f'), jsr(syms['ramCheatApply']))       # GG codes: START
     patch(0xFF5642, bytes.fromhex('303900a13002080000016' '7f4'), jsr(syms['ramEraseWait']) + bytes.fromhex('4e71') * 3)  # erase wait
     disp = syms['ramAbout'] - (0xFF7C0A + 2)

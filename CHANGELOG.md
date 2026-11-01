@@ -7,6 +7,10 @@
 
 ## EverDrive-MD v1 / v2 — `OS-V38-PTBR.BIN`
 
+### 1.30 — 2026-11-01
+- **Música no menu:** cada tema tem a sua música (composições próprias, som FM do Mega Drive), em loop, tocada pelo processador de som do console (Z80) sem atrapalhar a leitura do cartão. Vem **ligada**; o item **Música** do menu principal liga e desliga na hora. A música para sozinha quando o jogo começa.
+- O `TEMAS.BIN` novo traz as músicas: troque o `EDMD/V1EXT.BIN` **e** o `EDMD/TEMAS.BIN` (o firmware gravado não mudou).
+
 ### 1.29 — 2026-10-31
 - **Rodapé com espaço:** a linha acima do rodapé fica vazia; o contador de página vai para a direita da barra do nome, no formato curto **1/3** (o nome mostra até 31 caracteres). A marca `[*]` dos resultados da busca fica logo acima do contador.
 - Só o `V1EXT.BIN` mudou: quem já está na 1.22 ou mais nova troca o `EDMD/V1EXT.BIN`.
@@ -159,6 +163,10 @@
   originais e o console permanece em Ferramentas para tentar novamente.
 
 ## EverDrive-MD v3 — `MDOS.ptbr.BIN`
+
+### 1.30 — 2026-11-01
+- **Música no menu:** cada tema tem a sua música (composições próprias, som FM), em loop, tocada pelo Z80. Vem **ligada**; **Opções → Música** liga e desliga. A música para sozinha quando o jogo começa.
+- Troque o `EDMD/MDOS.BIN` **e** o `EDMD/TEMAS.BIN` juntos: o `TEMAS.BIN` novo (com as músicas) não funciona com o OS da 1.27-1.29, nem o antigo com este.
 
 ### 1.29 — 2026-10-31
 - **Correção do idioma:** a troca de idioma deixava o menu bagunçado (a mensagem não cabia na tela) e não ficava salva direito (a SRAM do cartucho só guarda um byte de cada palavra). Agora o idioma fica salvo junto com o tema e **o console reinicia sozinho**, já no idioma novo.

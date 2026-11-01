@@ -276,7 +276,7 @@ def build_font_and_banner_2bpp():
     return bytes(out)
 
 
-MOD_VERSION = '1.29'      # same number for v1 and v3, shown in Info Sistema
+MOD_VERSION = '1.30'      # same number for v1 and v3, shown in Info Sistema
 PREVIEW_FRAMES = 19     # vblanks resting on a file before its cover is shown (~0.32 s NTSC)
 
 
@@ -301,6 +301,9 @@ def build_search(cls_banner, en=False):
     rmw = re.findall(r'\b(?:clr|tst|not|negx?|bset|bclr|bchg|tas|addq|subq|or|and|eor)[bwl]?\b[^\n]*\bc0000[0-7]\b', lst)
     assert not rmw, f'read-modify-write on a VDP port: {rmw}'
     return data
+
+
+MG = Path(__file__).resolve().parent
 
 
 def build_custom_mdos():
@@ -1071,6 +1074,8 @@ def build_custom_mdos():
     ext.label('pb_wall')
     ext.bsr_w('loadWallpaper')                      # the wallpaper too (first browser page: card is up)
     ext.bsr_w('wallDraw')
+    ext.emit(0x303c, 0x0600)                        # move.w #$0600, d0 (page 7: the theme's music)
+    ext.jsr_label('ovlEnter')
     ext.label('pb_tried')
     ext.emit(0x0c39, 0x0002, 0x00ff, 0xc5a4)        # cmpi.b #2, $ffc5a4.l
     ext.b_s(0x67, 'pb_image')
@@ -1448,6 +1453,7 @@ def build_custom_mdos():
         'str_opt_rst',
         'str_opt_theme',
         'str_opt_lang',
+        'str_opt_music',
     ])
 
     emit_menu_table('menu_no_recent', ['str_recent_title', 'str_no_recent'])
@@ -1549,6 +1555,8 @@ def build_custom_mdos():
     ext.emit_str(b'Tema Visual:   %%%%%%%%%%', b'Theme:         %%%%%%%%%%')
     ext.label('str_opt_lang')
     ext.emit_str(b'Idioma:        %%%%%%%', b'Language:      %%%%%%%')
+    ext.label('str_opt_music')
+    ext.emit_str(b'M\x85sica:        %%%%%%%', b'Music:         %%%%%%%')
     ext.label('str_world_7')
     ext.emit_str(b'MUNDO  ', b'WORLD  ')
     ext.label('str_off_7')
@@ -1709,7 +1717,7 @@ def build_custom_mdos():
     opt_asm.emit(0x4e75)                                # rts
 
     # openArt(a0 = path, d0.l = sector inside a theme): BANNER.ART and WALL.ART come from the chosen
-    # theme of /EDMD/TEMAS.BIN (make_temas.py: theme t at sector 1 + t * 64, wallpaper at +8) when
+    # theme of /EDMD/TEMAS.BIN (make_temas.py: theme t at sector 1 + t * 80, wallpaper at +8) when
     # that file exists, else from their own files; anything else is just opened. d0.b = 0: open.
     opt_asm.label('openArt')
     opt_asm.emit(0xb1fc, 0, 0)                          # cmpa.l #str_wall_path, a0
@@ -1730,8 +1738,8 @@ def build_custom_mdos():
     opt_asm.emit(0x2079, 0x00ff, 0xc47a)                # movea.l $ffc47a.l, a0 (settings)
     opt_asm.emit(0x7000)                                # moveq #0, d0
     opt_asm.emit(0x1028, 0x000d)                        # move.b $d(a0), d0 (theme)
-    opt_asm.emit(0x0200, 0x007f)                        # andi.b #$7f, d0 (bit 7 = language)
-    opt_asm.emit(0xed88)                                # lsl.l #6, d0
+    opt_asm.emit(0x0200, 0x003f)                        # andi.b #$3f, d0 (bit 7 language, bit 6 music off)
+    opt_asm.emit(0xc0fc, 80)                            # mulu.w #80, d0 (sectors per theme)
     opt_asm.emit(0xd097)                                # add.l (a7), d0
     opt_asm.emit(0x5280)                                # addq.l #1, d0 (after the name sector)
     opt_asm.emit(0x2f00)                                # move.l d0, -(a7)
@@ -1766,10 +1774,61 @@ def build_custom_mdos():
     opt_asm.jsr_label('ovlEnter')
     opt_asm.label('ds_go')
     opt_asm.jmp_label('dirOpenHook')
-    opt_code_end = len(opt_asm.buf)
+
+    # z80Stop: the YM2612 silent and the Z80 held in reset, bus back to it (game start, music off)
+    opt_asm.label('z80Stop')
+    opt_asm.b_s(0x61, 'z80Hold')                        # bsr.s
+    opt_asm.label('z80Park')
+    opt_asm.emit(0x33fc, 0x0000, 0x00a1, 0x1200)        # move.w #0, $a11200.l (reset)
+    opt_asm.emit(0x33fc, 0x0000, 0x00a1, 0x1100)        # move.w #0, $a11100.l (bus to the Z80)
+    opt_asm.emit(0x4e75)                                # rts
+    # z80Hold: Z80 bus to the 68000 (out of reset, so the bus can be granted), all FM keys off, TL max
+    opt_asm.label('z80Hold')
+    opt_asm.emit(0x33fc, 0x0100, 0x00a1, 0x1100)        # move.w #$100, $a11100.l
+    opt_asm.emit(0x33fc, 0x0100, 0x00a1, 0x1200)        # move.w #$100, $a11200.l
+    opt_asm.label('zh_w')
+    opt_asm.emit(0x0839, 0x0000, 0x00a1, 0x1100)        # btst #0, $a11100.l
+    opt_asm.b_s(0x66, 'zh_w')
+    opt_asm.emit(0x41f9, 0x00a0, 0x4000)                # lea.l $a04000.l, a0
+    opt_asm.emit(0x7206)                                # moveq #6, d1 (key codes 6 5 4 2 1 0)
+    opt_asm.label('zh_k')
+    opt_asm.emit(0x0c01, 0x0003)                        # cmpi.b #3, d1
+    opt_asm.b_s(0x67, 'zh_n')
+    opt_asm.emit(0x7028)                                # moveq #$28, d0
+    opt_asm.b_s(0x61, 'ymw')
+    opt_asm.label('zh_n')
+    opt_asm.dbra(1, 'zh_k')
+    opt_asm.emit(0x704f)                                # moveq #$4f, d0 (TL registers $40-$4f)
+    opt_asm.emit(0x727f)                                # moveq #$7f, d1
+    opt_asm.label('zh_t')
+    opt_asm.b_s(0x61, 'ymw')
+    opt_asm.emit(0x5488)                                # addq.l #2, a0 (part II)
+    opt_asm.b_s(0x61, 'ymw')
+    opt_asm.emit(0x5588)                                # subq.l #2, a0
+    opt_asm.emit(0x5300)                                # subq.b #1, d0
+    opt_asm.emit(0x0c00, 0x003f)                        # cmpi.b #$3f, d0
+    opt_asm.b_s(0x66, 'zh_t')
+    opt_asm.emit(0x4e75)                                # rts
+    opt_asm.label('ymw')                                # YM2612 (a0 = part): register d0 = d1
+    opt_asm.emit(0x0810, 0x0007)                        # btst #7, (a0)
+    opt_asm.b_s(0x66, 'ymw')
+    opt_asm.emit(0x1080)                                # move.b d0, (a0)
+    opt_asm.label('ymw2')
+    opt_asm.emit(0x0810, 0x0007)                        # btst #7, (a0)
+    opt_asm.b_s(0x66, 'ymw2')
+    opt_asm.emit(0x1141, 0x0001)                        # move.b d1, 1(a0)
+    opt_asm.emit(0x4e75)                                # rts
+    # startGame (0xFF567E, jmp here): silence the menu music first, then its first two instructions
+    opt_asm.label('startGameHook')
+    opt_asm.bsr_w('z80Stop')
+    opt_asm.emit(0x48e7, 0x2030)                        # movem.l d2/a2-a3, -(a7)
+    opt_asm.emit(0x267c, 0x00a1, 0x3000)                # movea.l #$a13000, a3
+    opt_asm.emit(0x4ef9, 0x00ff, 0x5688)                # jmp $ff5688.l
+    opt_code_end2 = len(opt_asm.buf)
 
     opt_asm.label('str_temas_path')
     opt_asm.emit_str(b'/EDMD/TEMAS.BIN')
+    opt_code_end = opt_code_end2
 
     # =========================================================================
     # blkA / blkB: old English strings that every reference was moved away from
@@ -2053,7 +2112,8 @@ def build_custom_mdos():
     ovl.emit(0x4e75)                                # rts
 
     # Options. Settings byte $d (the SRAM keeps only odd bytes): bit 7 = English (the English pages
-    # load at boot: changing it restarts the console), bits 0-6 = theme: a theme of /EDMD/TEMAS.BIN (names read into $ffd600 here;
+    # load at boot: changing it restarts the console), bit 6 = menu music off, bits 0-5 = theme: a theme
+    # of /EDMD/TEMAS.BIN (names read into $ffd600 here;
     # the new banner and wallpaper load when the menu closes) or, without that file, one of the
     # four built-in colour sets. d3 = 1: the theme changed.
     ovl.label('ovl_options')
@@ -2160,9 +2220,22 @@ def build_custom_mdos():
     ovl.emit(0x4e93)                            # jsr (a3) (edStrCopy)
     ovl.emit(0x508f)                            # addq.l #8, a7
 
+    # Option 6: menu music (bit 6 of $d = off)
+    ovl.lea_label(0, 'str_opt_music')
+    ovl.emit(0x4868, 0x000f)                    # pea.l $f(a0) (dst)
+    ovl.emit(0x082a, 0x0006, 0x000d)            # btst #6, $d(a2)
+    ovl.b_s(0x66, 'opt_mu_off')
+    ovl.pea_label('str_on_7')
+    ovl.b_s(0x60, 'opt_mu_copy')
+    ovl.label('opt_mu_off')
+    ovl.pea_label('str_off_7')
+    ovl.label('opt_mu_copy')
+    ovl.emit(0x4e93)                            # jsr (a3) (edStrCopy)
+    ovl.emit(0x508f)                            # addq.l #8, a7
+
     ovl.emit(0x3f04)                            # move.w d4, -(a7)
     ovl.emit(0x4267)                            # clr.w -(a7)
-    ovl.emit(0x4878, 0x0006)                    # pea.l $6.w
+    ovl.emit(0x4878, 0x0007)                    # pea.l $7.w
     ovl.pea_label('menu_options_5')
     ovl.emit(0x4eb9, 0x00ff, 0x4834)            # jsr $ff4834.l (menuDraw)
     ovl.emit(0x3800)                            # move.w d0, d4
@@ -2197,14 +2270,14 @@ def build_custom_mdos():
     ovl.bsr_w('opt_set_theme')
     ovl.jsr_label('applyTheme')
     ovl.bra_w('opt_refresh')
-    ovl.label('opt_set_theme')                  # theme d0 into bits 0-6 of $d, the language bit stays
-    ovl.emit(0x022a, 0x0080, 0x000d)            # andi.b #$80, $d(a2)
+    ovl.label('opt_set_theme')                  # theme d0 into bits 0-5 of $d, language + music stay
+    ovl.emit(0x022a, 0x00c0, 0x000d)            # andi.b #$c0, $d(a2)
     ovl.emit(0x812a, 0x000d)                    # or.b d0, $d(a2)
     ovl.emit(0x4e75)                            # rts
 
     ovl.label('opt_tog_chk5')
     ovl.emit(0x0c40, 0x0005)                    # cmpi.w #5, d0 (5 = language)
-    ovl.bne_w('opt_tog_bool')
+    ovl.bne_w('opt_tog_chk6')
     ovl.emit(0x0a2a, 0x0080, 0x000d)            # eori.b #$80, $d(a2) (saved: the settings live in SRAM)
     # the English text goes in at boot: restart the console like the reset button does (the cart's
     # boot ROM is at 0 while the OS runs: its vectors load MDOS.BIN again)
@@ -2212,6 +2285,13 @@ def build_custom_mdos():
     ovl.emit(0x2e78, 0x0000)                    # movea.l $0.w, a7
     ovl.emit(0x2078, 0x0004)                    # movea.l $4.w, a0
     ovl.emit(0x4ed0)                            # jmp (a0)
+
+    ovl.label('opt_tog_chk6')
+    ovl.emit(0x0c40, 0x0006)                    # cmpi.w #6, d0 (6 = music)
+    ovl.bne_w('opt_tog_bool')
+    ovl.emit(0x0a2a, 0x0040, 0x000d)            # eori.b #$40, $d(a2)
+    ovl.emit(0x7601)                            # moveq #1, d3 (theme, wallpaper and music load again)
+    ovl.bra_w('opt_refresh')
 
     ovl.label('opt_tog_bool')
     ovl.emit(0x3004)                            # move.w d4, d0
@@ -2240,7 +2320,7 @@ def build_custom_mdos():
     ovl.label('opt_th_n')
     ovl.emit(0x7000)                            # moveq #0, d0
     ovl.emit(0x102a, 0x000d)                    # move.b $d(a2), d0
-    ovl.emit(0x0200, 0x007f)                    # andi.b #$7f, d0 (bit 7 = language)
+    ovl.emit(0x0200, 0x003f)                    # andi.b #$3f, d0 (bit 7 language, bit 6 music off)
     ovl.emit(0x4a41)                            # tst.w d1
     ovl.b_s(0x67, 'opt_th_ret')
     ovl.emit(0xb041)                            # cmp.w d1, d0
@@ -2464,6 +2544,89 @@ def build_custom_mdos():
     assert len(en_page.buf) <= 7 * 512, f'English page too large: {len(en_page.buf)}'
     rom[PAGE(6):PAGE(6) + len(en_page.buf)] = en_page.buf
 
+    # Page 7: the menu music (printBanner calls it after the wallpaper). Loads musica/z80drv.bin into
+    # the Z80 RAM and the theme's song (TEMAS.BIN: sector 1 + t * SLOT + MUSIC, 13 sectors) at 0x0400
+    # through $ffd600, then starts the Z80; music off / no song: Z80 held in reset, FM silent.
+    drv = (MG / 'musica' / 'z80drv.bin').read_bytes()
+    mp = Asm68k(0xFFC800)
+    mp.emit(0x48e7, 0x3c30)                         # movem.l d2-d5/a2-a3, -(a7)
+    mp.jsr_label('z80Hold')
+    mp.emit(0x2079, 0x00ff, 0xc47a)                 # movea.l $ffc47a.l, a0
+    mp.emit(0x7400)                                 # moveq #0, d2
+    mp.emit(0x1428, 0x000d)                         # move.b $d(a0), d2
+    mp.emit(0x0802, 0x0006)                         # btst #6, d2 (music off)
+    mp.bne_w('mu_off')
+    mp.emit(0x0242, 0x003f)                         # andi.w #$3f, d2 (theme)
+    mp.emit(0x42a7)                                 # clr.l -(a7)
+    mp.pea_label('str_temas_path')
+    mp.emit(0x4eb9, 0x00ff, 0x2f48)                 # jsr fatOpenFileByName
+    mp.emit(0x508f)                                 # addq.l #8, a7
+    mp.emit(0x4a00)                                 # tst.b d0
+    mp.bne_w('mu_off')
+    mp.bsr_w('mu_sec')                              # the name sector -> $ffd600
+    mp.bne_w('mu_off')
+    mp.emit(0x0cb9, 0x544d, 0x4153, 0x00ff, 0xd600) # cmpi.l #'TMAS', $ffd600.l
+    mp.bne_w('mu_off')
+    mp.emit(0xb479, 0x00ff, 0xd604)                 # cmp.w $ffd604.l, d2 (count)
+    mp.bcc_w('mu_off')
+    mp.emit(0x7600)                                 # moveq #0, d3
+    mp.emit(0x3639, 0x00ff, 0xd60a)                 # move.w $ffd60a.l, d3 (MUSIC: 0 = none)
+    mp.beq_w('mu_off')
+    mp.emit(0xc4f9, 0x00ff, 0xd606)                 # mulu.w $ffd606.l, d2 (* SLOT)
+    mp.emit(0xd483)                                 # add.l d3, d2 (the name sector is read already)
+    mp.emit(0x2f02)                                 # move.l d2, -(a7)
+    mp.emit(0x4eb9, 0x00ff, 0x21d8)                 # jsr fatSkipSectors
+    mp.emit(0x588f)                                 # addq.l #4, a7
+    mp.emit(0x4a00)                                 # tst.b d0
+    mp.bne_w('mu_off')
+    mp.lea_pc(0, 'mu_drv')                          # the player -> Z80 0x0000
+    mp.emit(0x43f9, 0x00a0, 0x0000)                 # lea.l $a00000.l, a1
+    mp.emit(0x303c, len(drv) - 1)                   # move.w #len-1, d0
+    mp.label('mu_cp')
+    mp.emit(0x12d8)                                 # move.b (a0)+, (a1)+
+    mp.dbra(0, 'mu_cp')
+    mp.emit(0x45f9, 0x00a0, 0x0400)                 # lea.l $a00400.l, a2 (the song)
+    mp.emit(0x780c)                                 # moveq #12, d4 (13 sectors)
+    mp.label('mu_rd')
+    mp.bsr_w('mu_sec')
+    mp.bne_w('mu_off')
+    mp.emit(0x41f9, 0x00ff, 0xd600)                 # lea.l $ffd600.l, a0
+    mp.emit(0x303c, 511)                            # move.w #511, d0
+    mp.label('mu_cp2')
+    mp.emit(0x14d8)                                 # move.b (a0)+, (a2)+
+    mp.dbra(0, 'mu_cp2')
+    mp.dbra(4, 'mu_rd')
+    mp.emit(0x0c39, 0x0004, 0x00a0, 0x0401)         # cmpi.b #4, $a00401.l (first command at 0x04xx?)
+    mp.bne_w('mu_off')
+    mp.emit(0x33fc, 0x0000, 0x00a1, 0x1200)         # move.w #0, $a11200.l (reset)
+    mp.emit(0x33fc, 0x0000, 0x00a1, 0x1100)         # move.w #0, $a11100.l (bus to the Z80)
+    mp.emit(0x707f)                                 # moveq #$7f, d0
+    mp.label('mu_dly')
+    mp.dbra(0, 'mu_dly')
+    mp.emit(0x33fc, 0x0100, 0x00a1, 0x1200)         # move.w #$100, $a11200.l: the Z80 runs the player
+    mp.bra_w('mu_ret')
+    mp.label('mu_off')
+    mp.jsr_label('z80Park')
+    mp.label('mu_ret')
+    mp.emit(0x4cdf, 0x0c3c)                         # movem.l (a7)+, d2-d5/a2-a3
+    mp.emit(0x4e75)                                 # rts
+    mp.label('mu_sec')                              # one sector of the open file -> $ffd600; Z = read
+    mp.emit(0x4878, 0x0001)                         # pea.l $1.w
+    mp.emit(0x4878, 0x0001)                         # pea.l $1.w
+    mp.emit(0x4879, 0x00ff, 0xd600)                 # pea.l $ffd600.l
+    mp.emit(0x4eb9, 0x00ff, 0x23c6)                 # jsr fatRead
+    mp.emit(0x4fef, 0x000c)                         # lea.l $c(a7), a7
+    mp.emit(0x4a00)                                 # tst.b d0
+    mp.emit(0x4e75)                                 # rts
+    mp_code_end = len(mp.buf)
+    mp.label('mu_drv')
+    mp.emit_b(drv)
+    mp.resolve(all_labels)
+    assert len(mp.buf) <= 7 * 512, f'music page too large: {len(mp.buf)}'
+    assert rom[PAGE(7):PAGE(7) + 7 * 512] == bytes(7 * 512)
+    rom[PAGE(7):PAGE(7) + len(mp.buf)] = mp.buf
+    assert len(list(Cs(CS_ARCH_M68K, CS_MODE_M68K_000 | CS_MODE_BIG_ENDIAN).disasm(bytes(mp.buf[:mp_code_end]), 0xFFC800))) > 50
+
     assert 0x6E48 + len(ext.buf) <= 0x8000, f"Extension exceeds 32KB limit: 0x{0x6E48 + len(ext.buf):04X}"
     rom[0x6E48:0x6E48 + len(ext.buf)] = ext.buf
 
@@ -2530,6 +2693,10 @@ def build_custom_mdos():
     # B7. wallpaper: end of the plane clear (ff37c2: lea $18(a7),a7; rts) -> jmp wallHook
     assert rom[0x37E0:0x37E6] == bytes.fromhex('4fef00184e75')
     struct.pack_into('>HI', rom, 0x37E0, 0x4EF9, all_labels['wallHook'])
+
+    # B9. game start: the menu music stops (startGame 0xFF567E: movem.l d2/a2-a3,-(a7); movea.l #$a13000,a3)
+    assert rom[0x567E:0x5688] == bytes.fromhex('48e72030267c00a13000')
+    struct.pack_into('>HIHH', rom, 0x567E, 0x4EF9, all_labels['startGameHook'], 0x4E71, 0x4E71)
 
     # B8. folder (re)read: drop the letter filter tag (ff1c8c: move.l d2,-(a7); move.l 8(a7),-(a7))
     assert rom[0x1C8C:0x1C92] == bytes.fromhex('2f022f2f0008')
@@ -2687,7 +2854,8 @@ def build_custom_mdos():
     print(f"  opt  (0xFF49B6):  {len(opt_asm.buf)} / 414 bytes")
     print(f"  blkA (0xFF6854):  {len(blkA.buf)} / 124 bytes   blkB (0xFF6B08):  {len(blkB.buf)} / 222 bytes")
     print(f"  ovl  (file 0x8000 -> 0xFFC800): {len(ovl.buf)} / 3584 bytes, search (file 0x8E00): {len(search)} / 3584 bytes")
-    print(f"  English: page 6 (text) {len(en_page.buf)} / 3584 bytes, search {len(search_en)} / 3584 bytes")
+    print(f"  English: page 6 (text) {len(en_page.buf)} / 3584 bytes, search {len(search_en)} / 3584 bytes; "
+          f"music: page 7 {len(mp.buf)} / 3584 bytes")
     print(f"  ext  (0xFF6E48):  0xFF6E48..0xFF{0x6E48 + used - 1:04X} ({used} bytes used, {free} bytes free)")
     print(f"  SHA-256: {sha}")
     print("  100% verified: 0 clone-check instructions, all m68k code blocks disassembled cleanly!")

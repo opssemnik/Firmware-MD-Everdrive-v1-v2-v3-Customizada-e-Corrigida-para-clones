@@ -14,6 +14,8 @@ import emu
 
 
 class MachineV3(emu.Machine):
+    START_ARG = 4 + 12              # startGame after its movem (1.30: the music stop runs before it)
+
     def __init__(self, os_path, sd_path, log=print):
         self.log = log
         self.mu = mu = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, UC_CPU_M68K_M68000)
@@ -21,6 +23,7 @@ class MachineV3(emu.Machine):
         mu.mmio_map(0x080000, 0x10000, self.ed_r, None, self.ed_w, None)   # EverDrive v3 registers
         mu.mem_map(0x090000, 0x800000 - 0x090000)
         mu.mem_map(0xFF0000, 0x10000)
+        mu.mem_map(0xA00000, 0x10000)                   # Z80 RAM + YM2612 (the menu music)
         mu.mmio_map(0xA10000, 0x10000, self.io_r, None, self.io_w, None)
         mu.mmio_map(0xC00000, 0x10000, self.vdp_r, None, self.vdp_w, None)
         osimg = Path(os_path).read_bytes()
@@ -48,9 +51,11 @@ class MachineV3(emu.Machine):
         self.calls = {}
         self.align_errors = []
         for addr, fn in {0xFF11DA: self.disk_read, 0xFF12A0: self.disk_write, 0xFF1162: self.ret_void,
-                         0xFF118A: self.ret0, 0xFF567E: self.start_game}.items():
+                         0xFF118A: self.ret0, 0xFF5688: self.start_game}.items():
             mu.hook_add(UC_HOOK_CODE, self._wrap(fn), begin=addr, end=addr)
         mu.hook_add(UC_HOOK_MEM_UNMAPPED, self.unmapped)
+        self.ym, self.ym_addr, self.z80 = [], [0, 0], {0x1100: 0, 0x1200: 0}
+        mu.hook_add(UC_HOOK_MEM_WRITE, self.z80_w, begin=0xA04000, end=0xA04003)
         # the cart SRAM (settings, recents, favourites: 0x100000..0x13FFFF here) keeps only the low byte
         # of each word on the real cart: a byte written to an even address or a word with a high byte
         # is lost there (the 1.27 language byte bug), so flag it
@@ -101,6 +106,8 @@ class MachineV3(emu.Machine):
     def io_w(self, mu, off, size, value, ud):
         if off in (2, 3):
             self.th = value & 0x40
+        if off in (0x1100, 0x1200):                      # Z80 bus request / reset (word writes, bit 8)
+            self.z80[off] = value
 
     def run(self, frames, insns_per_frame=20000):
         pc = self.mu.reg_read(UC_M68K_REG_PC)

@@ -31,7 +31,7 @@ class Machine:
         mu.mem_write(0x10000, osimg)
         mu.mem_write(0x30000, flash_init if flash_init else b'\xff' * 0x10000)
         mu.mem_write(0xFF0000, osimg)
-        mu.mem_write(0xFFEF00, bytes([0xA5]) * (0x10000 - 0xEF00 - 0x10))   # stack low-water pattern (above the mod bss)
+        mu.mem_write(0xFFF000, bytes([0xA5]) * (0x10000 - 0xF000 - 0x10))   # stack low-water pattern (above the mod bss)
         self.sd = bytearray(Path(sd_path).read_bytes())
         self.vram = bytearray(0x10000)
         self.cram = [0] * 64
@@ -48,9 +48,11 @@ class Machine:
         self.calls = {}
         for addr, fn in {0xFF175A: self.sd_init, 0xFF182C: self.sd_read, 0xFF1912: self.sd_write,
                          0xFF1866: self.sd_write1, 0xFF5592: self.flash_erase, 0xFF57D0: self.flash_write,
-                         0xFF7FEE: self.ret0, 0xFF8080: self.ret0, 0xFF4F32: self.start_game}.items():
+                         0xFF7FEE: self.ret0, 0xFF8080: self.ret0, 0xFF4F38: self.start_game}.items():
             mu.hook_add(UC_HOOK_CODE, self._wrap(fn), begin=addr, end=addr)
         mu.hook_add(UC_HOOK_MEM_UNMAPPED, self.unmapped)
+        self.ym, self.ym_addr, self.z80 = [], [0, 0], {0x1100: 0, 0x1200: 0}
+        mu.hook_add(UC_HOOK_MEM_WRITE, self.z80_w, begin=0xA04000, end=0xA04003)
         # a real 68000 raises an address error for word/long accesses at odd addresses
         for lo, hi in ((0x000000, 0x7FFFFF), (0xFF0000, 0xFFFFFF)):
             mu.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, self.align, begin=lo, end=hi)
@@ -131,10 +133,21 @@ class Machine:
         self.mu.mem_write(addr, bytes(self.mu.mem_read(src & 0xFFFFFF, n * 512)))
         return 0
 
+    START_AT = 0xFF4F38             # osStartGame after its first two instructions (1.30: the mod's music
+    START_ARG = 4 + 4 + 16          # stop runs before them): return address, subq #4, movem of 4 registers
+
     def start_game(self):
-        self.stopped = f'startGame({self.arg(0)})'
+        self.stopped = f'startGame({self.u32(self.mu.reg_read(UC_M68K_REG_A7) + 4 + self.START_ARG - 4)})'
         self.mu.emu_stop()
         return None
+
+    # ------------------------------------------------------------ Z80 / YM2612 (the menu music)
+    def z80_w(self, mu, access, addr, size, value, ud):
+        if 0xA04000 <= addr <= 0xA04003:
+            if addr & 1:
+                self.ym.append((addr >> 1 & 1, self.ym_addr[addr >> 1 & 1], value & 0xFF))
+            else:
+                self.ym_addr[addr >> 1 & 1] = value & 0xFF
 
     # ------------------------------------------------------------ I/O
     def io_r(self, mu, off, size, ud):
@@ -151,6 +164,8 @@ class Machine:
     def io_w(self, mu, off, size, value, ud):
         if off == 3:
             self.th = value & 0x40
+        if off in (0x1100, 0x1200):                      # Z80 bus request / reset (word writes, bit 8)
+            self.z80[off] = value
 
     # ------------------------------------------------------------ VDP
     def vdp_r(self, mu, off, size, ud):

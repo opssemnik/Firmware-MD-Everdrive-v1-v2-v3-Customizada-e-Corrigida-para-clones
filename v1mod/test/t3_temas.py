@@ -29,7 +29,7 @@ def lines(m):
 
 
 def theme(i):
-    base = 512 + i * 64 * 512
+    base = 512 + i * struct.unpack(">H", PACK[6:8])[0] * 512     # SLOT sectors per theme
     return PACK[base:base + 7 * 512], PACK[base + 8 * 512:base + 64 * 512]
 
 

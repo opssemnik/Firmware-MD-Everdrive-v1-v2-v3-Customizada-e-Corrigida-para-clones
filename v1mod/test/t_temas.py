@@ -27,7 +27,7 @@ def lines(m):
 
 
 def shows_theme(m, i):
-    base = 512 + i * 64 * 512
+    base = 512 + i * struct.unpack(">H", PACK[6:8])[0] * 512     # SLOT sectors per theme
     banner, wall = PACK[base:base + 7 * 512], PACK[base + 8 * 512:base + 64 * 512]
     tiles = bytes(m.vram[0x2E00:0x2E00 + 0xD80]) == banner[32:32 + 0xD80]
     names = bytes(m.vram[0x0100:0x0100 + 2240]) == wall[32:32 + 2240]
